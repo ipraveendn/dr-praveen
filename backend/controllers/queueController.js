@@ -1,6 +1,8 @@
 // Queue Controller
 // Handles queue management, token booking, and queue tracking
 
+import { sendTokenNotificationSMS } from '../utils/smsService.js'
+
 // ===== IN-MEMORY QUEUE STATE =====
 // Stores all tokens for today's queue
 // Persists while server is running, resets on restart
@@ -153,6 +155,24 @@ export const addToken = async (req, res) => {
       totalInQueue: queueArray.length
     })
 
+    // Calculate estimated wait time
+    const waitingPatients = queueArray.filter(p => p.status === 'waiting').length
+    const estimatedTime = `${waitingPatients * 5} mins`
+
+    // Send SMS notification asynchronously (don't wait for it)
+    const smsPayload = {
+      name,
+      phone,
+      tokenNumber,
+      clinic,
+      reason,
+      estimatedTime
+    }
+    sendTokenNotificationSMS(smsPayload).catch(err => {
+      console.error('[SMS SEND FAILED]', err)
+      // Don't fail the token creation if SMS fails
+    })
+
     res.status(201).json({
       success: true,
       data: {
@@ -160,7 +180,8 @@ export const addToken = async (req, res) => {
         clinic,
         patient: name,
         phone,
-        reason
+        reason,
+        estimatedTime
       },
       message: 'Token created successfully'
     })

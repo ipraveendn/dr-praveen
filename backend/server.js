@@ -2,13 +2,19 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import authRoutes from './routes/auth.js'
 import queueRoutes from './routes/queue.js'
 import paymentRoutes from './routes/payment.js'
 import { seedDemoQueue } from './controllers/queueController.js'
 
-// Load environment variables
-dotenv.config()
+// Get current directory for ES modules
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+// Load environment variables from backend/.env
+dotenv.config({ path: path.join(__dirname, '.env') })
 
 const app = express()
 const PORT = Number(process.env.PORT) || 5000
@@ -58,13 +64,17 @@ const safeStringify = (value) => {
 // CORS configuration - Allow frontend to communicate
 const corsOptions = {
   origin: [
+    // Local development
     'http://localhost:3000',       // Frontend dev server (PRIMARY)
     'http://localhost:3001',       // Frontend dev server (FALLBACK)
     'http://localhost:5173',       // Vite default port
     'http://127.0.0.1:3000',
     'http://127.0.0.1:3001',
     'http://127.0.0.1:5173',
-    'https://dr-praveen.vercel.app'
+    // Production deployments
+    'https://dr-praveen.vercel.app',
+    'https://dr-praveen.onrender.com',
+    'https://www.dr-praveen.onrender.com'
   ],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   credentials: true,

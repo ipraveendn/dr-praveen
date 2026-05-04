@@ -14,7 +14,7 @@ const { API_BASE_URL } = getConfig()
  */
 export async function checkBackendConnection() {
   try {
-    const response = await fetch(`${API_BASE_URL}/health`, {
+    const response = await fetch(`${API_BASE_URL}/api/health`, {
       method: 'GET',
       timeout: 5000
     })
@@ -41,7 +41,7 @@ export async function getConnectionDiagnostics() {
 
   try {
     // Check health endpoint
-    const healthResponse = await fetch(`${API_BASE_URL}/health`, {
+    const healthResponse = await fetch(`${API_BASE_URL}/api/health`, {
       method: 'GET'
     })
     diagnostics.backendAvailable = healthResponse.ok
