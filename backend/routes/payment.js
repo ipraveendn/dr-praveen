@@ -18,35 +18,16 @@ router.use((req, res, next) => {
 })
 
 // Razorpay Payment APIs
-router.post('/create-order', (req, res, next) => {
-  console.log('[PAYMENT] POST /create-order called')
-  createOrder(req, res, next)
-})
-
-router.post('/verify', (req, res, next) => {
-  console.log('[PAYMENT] POST /verify called')
-  verifyPaymentRazorpay(req, res, next)
-})
+router.post('/create-order', createOrder)
+router.post('/verify', verifyPaymentRazorpay)
 
 // Additional payment routes
-router.post('/initiate', authMiddleware, (req, res, next) => {
-  console.log('[PAYMENT] POST /initiate called')
-  initiatePayment(req, res, next)
-})
-
-router.get('/history/:patientId', authMiddleware, (req, res, next) => {
-  console.log('[PAYMENT] GET /history/:patientId called')
-  getPaymentHistory(req, res, next)
-})
-
-router.post('/refund/:paymentId', authMiddleware, (req, res, next) => {
-  console.log('[PAYMENT] POST /refund/:paymentId called')
-  processRefund(req, res, next)
-})
+router.post('/initiate', authMiddleware, initiatePayment)
+router.get('/history/:patientId', authMiddleware, getPaymentHistory)
+router.post('/refund/:paymentId', authMiddleware, processRefund)
 
 // GET handler for /api/payment base path info
 router.get('/', (req, res) => {
-  console.log('[PAYMENT] GET / called')
   res.json({
     message: 'Payment API',
     endpoints: {
