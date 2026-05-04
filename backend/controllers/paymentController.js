@@ -16,10 +16,12 @@ const mockOrders = new Map()
  */
 export const createOrder = async (req, res) => {
   try {
+    console.log('[createOrder] Request received:', JSON.stringify(req.body))
     const { amount } = req.body
 
     // Validate amount
     if (!amount || amount <= 0) {
+      console.warn('[createOrder] Invalid amount:', amount)
       return res.status(400).json({
         error: 'Bad Request',
         message: 'Valid amount is required',
@@ -62,10 +64,12 @@ export const createOrder = async (req, res) => {
 
 export const verifyPaymentRazorpay = async (req, res) => {
   try {
+    console.log('[verifyPaymentRazorpay] Request received:', JSON.stringify(req.body))
     const { orderId, paymentId, signature } = req.body
 
     // Validate required fields
     if (!orderId || !paymentId || !signature) {
+      console.warn('[verifyPaymentRazorpay] Missing required fields:', { orderId, paymentId, signature })
       return res.status(400).json({
         error: 'Bad Request',
         message: 'orderId, paymentId, and signature are required',
@@ -80,6 +84,7 @@ export const verifyPaymentRazorpay = async (req, res) => {
     // Check if order exists in mock storage
     const order = mockOrders.get(orderId)
     if (!order) {
+      console.warn('[verifyPaymentRazorpay] Order not found:', orderId)
       return res.status(404).json({
         error: 'Not Found',
         message: 'Order not found',

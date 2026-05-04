@@ -3,9 +3,12 @@
  * Centralizes API endpoint and automatically attaches JWT Bearer token.
  */
 
-// Centralized API base URL for the Render backend.
-const API_BASE_URL = "http://localhost:5000/api";
-const API_TIMEOUT = 30000;
+// Import environment configuration
+import { getConfig } from '../config/environment.js'
+
+const config = getConfig()
+const API_BASE_URL = `${config.API_BASE_URL}/api`;
+const API_TIMEOUT = config.API_TIMEOUT;
 
 /**
  * Enhanced fetch function with automatic JWT authentication and timeout.
