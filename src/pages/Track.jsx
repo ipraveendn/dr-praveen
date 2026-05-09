@@ -6,12 +6,19 @@ import { DOCTOR } from '../data/content'
 import { apiRequest } from '../utils/api'
 
 export default function Track() {
+  // Extract tracking ID from URL path or query params
+  const pathParts = window.location.pathname.split('/')
+  const urlTrackingId = pathParts[pathParts.length - 1]
+  
   const params = new URLSearchParams(window.location.search)
   const [phone, setPhone] = useState(params.get('phone') || '')
-  const [data, setData]   = useState(null)
+  const [trackingId, setTrackingId] = useState(urlTrackingId?.startsWith('TRK-') ? urlTrackingId : '')
+  
+  const [data, setData] = useState(null)
   const [ahead, setAhead] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [autoRefresh, setAutoRefresh] = useState(true)
   
   // Queue status from backend
   const [queueStatus, setQueueStatus] = useState(null)
@@ -35,15 +42,61 @@ export default function Track() {
     }
   }
 
-  async function track(ph) {
+  /**
+   * Track appointment by tracking ID (new backend API)
+   */
+  async function trackByTrackingId(id) {
+    const trackId = id || trackingId
+    if (!trackId) { setError('Tracking ID is required'); return }
+    
+    setLoading(true); setError(''); setData(null)
+    try {
+      console.log('[TRACK BY ID]', trackId)
+      
+      // Call new backend API with tracking ID
+      const response = await fetch(`https://dr-praveen.onrender.com/api/queue/track/${trackId}`)
+      
+      if (!response.ok) {
+        throw new Error('Appointment not found. Please check your tracking link.')
+      }
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        console.log('[TRACKING DATA]', result.data)
+        setData({
+          ...result.data,
+          clinicId: result.data.clinic?.toLowerCase() || 'diaplus'
+        })
+        setAhead(result.data.tokensAhead || 0)
+        await fetchQueueStatus()
+      } else {
+        throw new Error(result.message || 'Failed to fetch tracking data')
+      }
+    } catch (err) {
+      console.error('[TRACKING ERROR]', err)
+      setError(err.message || 'Unable to fetch appointment details')
+    }
+    setLoading(false)
+  }
+
+  /**
+   * Track appointment by phone (legacy method)
+   */
+  async function trackByPhone(ph) {
     const p = ph || phone
     if (!p || p.length < 10) { setError('Enter a valid phone number'); return }
+    
     setLoading(true); setError(''); setData(null)
     try {
       const today = new Date().toDateString()
       const q = query(collection(db, 'patients'), where('phone', '==', p), where('date', '==', today))
       const snap = await getDocs(q)
-      if (snap.empty) { setError('No token found for this number today. Please book a token first.'); setLoading(false); return }
+      if (snap.empty) { 
+        setError('No token found for this number today. Please book a token first.'); 
+        setLoading(false)
+        return 
+      }
       const patient = { id: snap.docs[0].id, ...snap.docs[0].data() }
 
       // Count waiting patients ahead
@@ -55,24 +108,55 @@ export default function Track() {
       
       // Fetch queue status from backend
       await fetchQueueStatus()
-    } catch { setError('Something went wrong. Please try again.') }
+    } catch (err) {
+      console.error('[TRACK BY PHONE ERROR]', err)
+      setError('Something went wrong. Please try again.')
+    }
     setLoading(false)
   }
 
+  /**
+   * Handle tracking - either by ID or phone
+   */
+  function handleTrack() {
+    if (trackingId && trackingId.startsWith('TRK-')) {
+      trackByTrackingId(trackingId)
+    } else if (phone) {
+      trackByPhone(phone)
+    } else {
+      setError('Please enter a phone number or use a valid tracking link')
+    }
+  }
+
   useEffect(() => { 
-    if (params.get('phone')) track(params.get('phone'))
+    // If tracking ID is provided in URL, fetch immediately
+    if (trackingId && trackingId.startsWith('TRK-')) {
+      trackByTrackingId(trackingId)
+    } else if (params.get('phone')) {
+      trackByPhone(params.get('phone'))
+    }
     // Fetch queue status on mount
     fetchQueueStatus()
   }, [])
 
   useEffect(() => {
-    if (!data) return
-    const t = setInterval(() => track(phone), 30000)
+    if (!data || !autoRefresh) return
+    const t = setInterval(() => {
+      if (trackingId && trackingId.startsWith('TRK-')) {
+        trackByTrackingId(trackingId)
+      } else {
+        trackByPhone(phone)
+      }
+    }, 5000) // Refresh every 5 seconds
     return () => clearInterval(t)
-  }, [data])
+  }, [data, phone, trackingId, autoRefresh])
 
   const statusColor = { waiting: '#F59E0B', serving: '#0B7B6F', done: '#64748B' }
-  const statusLabel = { waiting: '⏳ Waiting', serving: ' Being Served', done: ' Done' }
+  const statusLabel = { 
+    waiting: '⏳ Waiting', 
+    serving: '👨‍⚕️ Being Served', 
+    done: '✅ Done' 
+  }
   const estWait = ahead * 10
 
   return (
@@ -94,23 +178,30 @@ export default function Track() {
                 <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '24px' }}>Use the phone number you registered with</p>
                 <input type="tel" placeholder="10-digit mobile number" value={phone} maxLength={10}
                   onChange={e => setPhone(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && track()}
+                  onKeyDown={e => e.key === 'Enter' && handleTrack()}
                   style={{ width: '100%', padding: '14px 16px', border: '1.5px solid #E2EEEC', borderRadius: '10px', fontSize: '15px', fontFamily: "'DM Sans',sans-serif", outline: 'none', marginBottom: '16px' }}
                   onFocus={e => e.target.style.borderColor = '#0B7B6F'}
                   onBlur={e => e.target.style.borderColor = '#E2EEEC'}
                 />
                 {error && <p style={{ color: '#ef4444', fontSize: '13px', marginBottom: '12px' }}>⚠️ {error}</p>}
-                <button onClick={() => track()} disabled={loading} className="btn-primary" style={{ width: '100%', justifyContent: 'center', fontSize: '15px', padding: '14px', opacity: loading ? 0.7 : 1 }}>
-                  {loading ? ' Searching...' : ' Track My Token'}
+                <button onClick={handleTrack} disabled={loading} className="btn-primary" style={{ width: '100%', justifyContent: 'center', fontSize: '15px', padding: '14px', opacity: loading ? 0.7 : 1 }}>
+                  {loading ? '🔄 Searching...' : '🔍 Track My Token'}
                 </button>
               </>
             ) : (
               <>
+                {/* Tracking ID display */}
+                {data.trackingId && (
+                  <div style={{ background: '#F0FDF4', borderRadius: '12px', padding: '12px', marginBottom: '16px', border: '1px solid #BBEF63', fontSize: '11px', color: '#166534', textAlign: 'center', fontFamily: "'DM Sans',monospace" }}>
+                    ID: {data.trackingId}
+                  </div>
+                )}
+
                 {/* Token card */}
                 <div style={{ background: 'linear-gradient(135deg,#0B7B6F,#096358)', borderRadius: '18px', padding: '28px', textAlign: 'center', marginBottom: '20px' }}>
                   <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '6px' }}>Your Token</div>
                   <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '72px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>#{String(data.tokenNumber).padStart(2,'0')}</div>
-                  <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: '13px', marginTop: '8px' }}>{data.clinicId === 'diaplus' ? 'Diaplus Endocrinology Clinic' : 'Thyroplus Endocrinology Clinic'}</div>
+                  <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: '13px', marginTop: '8px' }}>{data.clinic || (data.clinicId === 'diaplus' ? 'Diaplus Endocrinology Clinic' : 'Thyroplus Endocrinology Clinic')}</div>
                 </div>
 
                 {/* Stats */}
@@ -139,12 +230,17 @@ export default function Track() {
                 {/* Patient */}
                 <div style={{ background: '#F8FAFA', borderRadius: '12px', padding: '16px', border: '1px solid #E2EEEC', marginBottom: '20px' }}>
                   <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '4px' }}>Patient</div>
-                  <div style={{ fontWeight: '700', color: '#0A1628' }}>{data.name}</div>
+                  <div style={{ fontWeight: '700', color: '#0A1628' }}>{data.patient || data.name}</div>
                   <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>{data.reason}</div>
                 </div>
 
-                <p style={{ fontSize: '11px', color: '#64748B', textAlign: 'center', marginBottom: '16px' }}> Auto-refreshes every 30 seconds</p>
-                <button onClick={() => { setData(null); setPhone(''); }} style={{ width: '100%', background: 'none', border: '1.5px solid #E2EEEC', borderRadius: '10px', padding: '12px', color: '#64748B', fontSize: '13px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Track Different Token</button>
+                {/* Auto-refresh toggle */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', cursor: 'pointer', fontSize: '13px', color: '#64748B' }}>
+                  <input type="checkbox" checked={autoRefresh} onChange={e => setAutoRefresh(e.target.checked)} />
+                  <span>Auto-refresh every 5 seconds</span>
+                </label>
+
+                <button onClick={() => { setData(null); setPhone(''); setTrackingId(''); }} style={{ width: '100%', background: 'none', border: '1.5px solid #E2EEEC', borderRadius: '10px', padding: '12px', color: '#64748B', fontSize: '13px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Track Different Token</button>
               </>
             )}
           </div>
@@ -155,7 +251,7 @@ export default function Track() {
             
             {queueLoading ? (
               <div style={{ textAlign: 'center', padding: '28px', color: '#64748B' }}>
-                <div style={{ fontSize: '13px' }}>Loading queue status...</div>
+                <div style={{ fontSize: '13px' }}>🔄 Loading queue status...</div>
               </div>
             ) : queueStatus ? (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>

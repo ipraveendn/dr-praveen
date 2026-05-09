@@ -115,6 +115,7 @@ export default function App() {
           <Route path="/clinics" element={<Clinics />} />
           <Route path="/queue" element={<Queue />} />
           <Route path="/track" element={<Track />} />
+          <Route path="/track/:id" element={<Track />} />
           <Route path="/blog" element={<Blog />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/login" element={<Login />} />

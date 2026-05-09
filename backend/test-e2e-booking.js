@@ -1,11 +1,11 @@
 /**
  * End-to-End SMS Integration Test
- * Tests complete booking flow: Queue API → SMS Service → MSG91 API
+ * Tests complete booking flow: Queue API → SMS Service → Twilio API
  * 
  * Verifies:
  * - Token creation via /queue/add endpoint
  * - SMS service integration
- * - MSG91 API communication
+ * - Twilio API communication
  * - Complete flow from booking to SMS delivery
  */
 

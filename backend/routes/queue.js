@@ -21,7 +21,7 @@ router.post('/next', moveQueueForward)           // Move queue forward (Admin Da
 
 // Additional Queue routes
 router.post('/book', bookToken)
-router.get('/track/:phone', trackQueue)
+router.get('/track/:id', trackQueue)  // Updated: now accepts tracking ID or phone (backward compatible)
 router.get('/status/:clinicId', getQueueStatus)
 router.patch('/call-next/:clinicId', authMiddleware, callNextPatient)
 router.patch('/complete/:tokenNumber', completeConsultationByTokenNumber)

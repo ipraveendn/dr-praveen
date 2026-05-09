@@ -10,6 +10,9 @@ let queueArray = []
 let nextTokenNumber = 1
 let currentServingToken = null
 
+// Track mapping: maps tracking ID to token
+const trackingIdMap = new Map()
+
 console.log('[MODULE INIT] queueController loaded: nextTokenNumber =', nextTokenNumber, ', queueArray.length =', queueArray.length)
 
 /**
@@ -135,6 +138,15 @@ export const addToken = async (req, res) => {
     console.log('[DEBUG] nextTokenNumber AFTER increment:', nextTokenNumber)
     console.log('[DEBUG] Generated tokenNumber:', tokenNumber)
 
+    // ========== GENERATE TRACKING ID ==========
+    // Create unique tracking ID for this appointment
+    const trackingId = `TRK-${clinic.toUpperCase()}-${tokenNumber}-${Date.now().toString(36)}`
+    
+    console.log('[TRACKING ID GENERATED]')
+    console.log('  Tracking ID:', trackingId)
+    console.log('  Clinic:', clinic)
+    console.log('  Token Number:', tokenNumber)
+
     const tokenData = {
       tokenNumber,
       name,
@@ -142,16 +154,21 @@ export const addToken = async (req, res) => {
       reason,
       clinic,
       timestamp: new Date().toISOString(),
-      status: 'waiting'
+      status: 'waiting',
+      trackingId
     }
 
     // Add token to queue array
     queueArray.push(tokenData)
+    
+    // Store tracking ID mapping for quick lookup
+    trackingIdMap.set(trackingId, tokenNumber)
 
     console.log('[TOKEN CREATED]', {
       tokenNumber,
       patient: name,
       clinic,
+      trackingId,
       totalInQueue: queueArray.length
     })
 
@@ -159,19 +176,62 @@ export const addToken = async (req, res) => {
     const waitingPatients = queueArray.filter(p => p.status === 'waiting').length
     const estimatedTime = `${waitingPatients * 5} mins`
 
-    // Send SMS notification asynchronously (don't wait for it)
-    const smsPayload = {
-      name,
-      phone,
-      tokenNumber,
-      clinic,
-      reason,
-      estimatedTime
+    // ========== GENERATE TRACKING URL ==========
+    const baseUrl = process.env.FRONTEND_URL || 'https://dr-praveen.onrender.com'
+    const trackingUrl = `${baseUrl}/track/${trackingId}`
+    
+    console.log('[TRACKING URL GENERATED]')
+    console.log('  Tracking URL:', trackingUrl)
+
+    // ========== SEND SMS NOTIFICATION ==========
+    console.log('[SMS TRIGGER]')
+    console.log('  TOKEN CREATED:', tokenNumber)
+    console.log('  PATIENT NAME:', name)
+    console.log('  PHONE NUMBER:', phone)
+    console.log('  REASON:', reason)
+    console.log('  CLINIC:', clinic)
+    console.log('  TRACKING URL:', trackingUrl)
+
+    let smsResult = { success: false, error: 'SMS not sent' }
+
+    // Validate phone number before sending SMS
+    if (!phone || phone.toString().trim() === '') {
+      console.error('[PHONE NUMBER MISSING] Cannot send SMS without patient phone number')
+    } else {
+      console.log('  CALLING sendTokenNotificationSMS()...')
+      
+      const smsPayload = {
+        name,
+        phone,
+        tokenNumber,
+        clinic,
+        reason,
+        estimatedTime,
+        trackingUrl
+      }
+      
+      try {
+        // Send SMS and wait for result
+        smsResult = await sendTokenNotificationSMS(smsPayload)
+        
+        if (smsResult.success) {
+          console.log('[SMS SENT SUCCESSFULLY]')
+          console.log('  MESSAGE ID:', smsResult.data?.messageSid)
+          console.log('  STATUS:', smsResult.data?.status)
+          console.log('  TO:', smsResult.data?.to)
+        } else {
+          console.error('[SMS SEND ERROR]', smsResult.error)
+          console.error('  DETAILS:', smsResult.details)
+        }
+      } catch (err) {
+        console.error('[SMS SEND EXCEPTION]', err.message)
+        console.error('  STACK:', err.stack)
+        smsResult = {
+          success: false,
+          error: err.message
+        }
+      }
     }
-    sendTokenNotificationSMS(smsPayload).catch(err => {
-      console.error('[SMS SEND FAILED]', err)
-      // Don't fail the token creation if SMS fails
-    })
 
     res.status(201).json({
       success: true,
@@ -181,8 +241,11 @@ export const addToken = async (req, res) => {
         patient: name,
         phone,
         reason,
-        estimatedTime
+        estimatedTime,
+        trackingId,
+        trackingUrl
       },
+      sms: smsResult,
       message: 'Token created successfully'
     })
   } catch (error) {
@@ -255,21 +318,52 @@ export const bookToken = async (req, res) => {
 }
 
 /**
- * Track queue by phone number
- * @param {Object} req - Express request object
+ * Track queue by tracking ID or phone number
+ * @param {Object} req - Express request object with params {id or phone}
  * @param {Object} res - Express response object
  */
 export const trackQueue = async (req, res) => {
   try {
-    const { phone } = req.params
+    const { id } = req.params
+    const { phone } = req.query
 
-    // Find token by phone number
-    const token = queueArray.find(t => t.phone === phone)
+    console.log('[TRACK QUEUE REQUEST]')
+    console.log('  Tracking ID:', id)
+    console.log('  Phone (query):', phone)
 
-    if (!token) {
-      return res.status(404).json({
-        error: 'Not Found',
-        message: 'Token not found for this phone number'
+    let token = null
+
+    // Try to find by tracking ID first
+    if (id && id.startsWith('TRK-')) {
+      console.log('  Method: Tracking by ID')
+      token = queueArray.find(t => t.trackingId === id)
+      
+      if (!token) {
+        console.warn('[TRACKING ID NOT FOUND]', id)
+        return res.status(404).json({
+          error: 'Not Found',
+          message: 'Appointment not found with this tracking ID'
+        })
+      }
+    }
+    // Fallback to phone number if no tracking ID (backward compatibility)
+    else if (id || phone) {
+      const searchPhone = id || phone
+      console.log('  Method: Tracking by phone (legacy)')
+      token = queueArray.find(t => t.phone === searchPhone)
+      
+      if (!token) {
+        console.warn('[PHONE NOT FOUND]', searchPhone)
+        return res.status(404).json({
+          error: 'Not Found',
+          message: 'Token not found for this phone number'
+        })
+      }
+    }
+    else {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'Tracking ID or phone number required'
       })
     }
 
@@ -278,6 +372,7 @@ export const trackQueue = async (req, res) => {
     const tokensAhead = queueArray.filter((t, idx) => idx < tokenIndex && t.status === 'waiting').length
 
     const trackingData = {
+      trackingId: token.trackingId,
       tokenNumber: token.tokenNumber,
       patient: token.name,
       phone: token.phone,
@@ -286,19 +381,23 @@ export const trackQueue = async (req, res) => {
       status: token.status,
       tokensAhead,
       estimatedWaitTime: `${tokensAhead * 5} mins`,
-      bookedAt: token.timestamp
+      bookedAt: token.timestamp,
+      position: tokenIndex + 1,
+      totalInQueue: queueArray.length
     }
 
     console.log('[QUEUE TRACKED]', {
       tokenNumber: token.tokenNumber,
-      patient: token.name,
-      tokensAhead
+      trackingId: token.trackingId,
+      status: token.status,
+      tokensAhead,
+      position: tokenIndex + 1
     })
 
     res.status(200).json({
       success: true,
       data: trackingData,
-      message: 'Queue tracking retrieved'
+      message: 'Queue tracking data retrieved'
     })
   } catch (error) {
     console.error('[TRACK QUEUE ERROR]', error)
