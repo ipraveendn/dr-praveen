@@ -61,27 +61,37 @@ const safeStringify = (value) => {
 // ============================================
 // MIDDLEWARE
 // ============================================
-// CORS configuration - Allow frontend to communicate
-const corsOptions = {
-  origin: [
-    // Local development
-    'http://localhost:3000',       // Frontend dev server (PRIMARY)
-    'http://localhost:3001',       // Frontend dev server (FALLBACK)
-    'http://localhost:5173',       // Vite default port
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:3001',
-    'http://127.0.0.1:5173',
-    // Production deployments
-    'https://dr-praveen.vercel.app',
-    'https://dr-praveen.onrender.com',
-    'https://www.dr-praveen.onrender.com'
-  ],
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  credentials: true,
-  optionsSuccessStatus: 200
-}
 
-app.use(cors(corsOptions))
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "https://dr-praveen.onrender.com",
+  "https://3000-firebase-dr-praveen-new-1778333674137.cluster-d5vecjrg5rhlkrz6nm4jtv7avc.cloudworkstations.dev"
+];
+
+app.use(cors({
+  origin: function(origin, callback) {
+
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    console.log("Blocked origin:", origin);
+
+    return callback(new Error("CORS blocked"));
+  },
+
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
+app.options("*", cors());
+
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
@@ -258,7 +268,7 @@ const startServer = (port) => {
 }
 
 // app.listen(PORT) is invoked here at the end (via startServer).
-// If PORT is busy, we retry the next port instead of exiting immediately.
+// If the PORT is busy, we retry the next port instead of exiting immediately.
 startServer(PORT)
 
 export default app
