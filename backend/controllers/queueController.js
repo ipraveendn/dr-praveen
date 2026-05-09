@@ -111,15 +111,16 @@ export const getQueueData = async (req, res) => {
 /**
  * Add new token to queue
  * Accepts patient details and generates SEQUENTIAL token number
- * @param {Object} req - Express request object with body {name, phone, reason, clinic}
+ * @param {Object} req - Express request object with body {name, phone, reason, clinic, trackingUrl}
  * @param {Object} res - Express response object
  */
 export const addToken = async (req, res) => {
   try {
-    const { name, phone, reason, clinic } = req.body
+    const { name, phone, reason, clinic, trackingUrl } = req.body
     console.log("CLINIC RECEIVED:", clinic)
+    console.log("TRACKING URL FROM FRONTEND:", trackingUrl);
 
-    console.log('[DEBUG] addToken called', { name, phone, reason, clinic })
+    console.log('[DEBUG] addToken called', { name, phone, reason, clinic, trackingUrl })
     console.log('[DEBUG] nextTokenNumber BEFORE increment:', nextTokenNumber)
     console.log('[DEBUG] queueArray length:', queueArray.length)
 
@@ -138,15 +139,6 @@ export const addToken = async (req, res) => {
     console.log('[DEBUG] nextTokenNumber AFTER increment:', nextTokenNumber)
     console.log('[DEBUG] Generated tokenNumber:', tokenNumber)
 
-    // ========== GENERATE TRACKING ID ==========
-    // Create unique tracking ID for this appointment
-    const trackingId = `TRK-${clinic.toUpperCase()}-${tokenNumber}-${Date.now().toString(36)}`
-    
-    console.log('[TRACKING ID GENERATED]')
-    console.log('  Tracking ID:', trackingId)
-    console.log('  Clinic:', clinic)
-    console.log('  Token Number:', tokenNumber)
-
     const tokenData = {
       tokenNumber,
       name,
@@ -154,21 +146,16 @@ export const addToken = async (req, res) => {
       reason,
       clinic,
       timestamp: new Date().toISOString(),
-      status: 'waiting',
-      trackingId
+      status: 'waiting'
     }
 
     // Add token to queue array
     queueArray.push(tokenData)
-    
-    // Store tracking ID mapping for quick lookup
-    trackingIdMap.set(trackingId, tokenNumber)
 
     console.log('[TOKEN CREATED]', {
       tokenNumber,
       patient: name,
       clinic,
-      trackingId,
       totalInQueue: queueArray.length
     })
 
@@ -176,13 +163,7 @@ export const addToken = async (req, res) => {
     const waitingPatients = queueArray.filter(p => p.status === 'waiting').length
     const estimatedTime = `${waitingPatients * 5} mins`
 
-    // ========== GENERATE TRACKING URL ==========
-    const baseUrl = process.env.FRONTEND_URL || 'https://dr-praveen.onrender.com'
-    const trackingUrl = `${baseUrl}/track/${trackingId}`
-    
-    console.log('[TRACKING URL GENERATED]')
-    console.log('  Tracking URL:', trackingUrl)
-
+    console.log("SMS TRACKING URL USED:", trackingUrl);
     // ========== SEND SMS NOTIFICATION ==========
     console.log('[SMS TRIGGER]')
     console.log('  TOKEN CREATED:', tokenNumber)
@@ -242,7 +223,6 @@ export const addToken = async (req, res) => {
         phone,
         reason,
         estimatedTime,
-        trackingId,
         trackingUrl
       },
       sms: smsResult,
@@ -318,38 +298,22 @@ export const bookToken = async (req, res) => {
 }
 
 /**
- * Track queue by tracking ID or phone number
- * @param {Object} req - Express request object with params {id or phone}
+ * Track queue by phone number
+ * @param {Object} req - Express request object with params {phone}
  * @param {Object} res - Express response object
  */
 export const trackQueue = async (req, res) => {
   try {
-    const { id } = req.params
     const { phone } = req.query
 
     console.log('[TRACK QUEUE REQUEST]')
-    console.log('  Tracking ID:', id)
     console.log('  Phone (query):', phone)
 
     let token = null
 
-    // Try to find by tracking ID first
-    if (id && id.startsWith('TRK-')) {
-      console.log('  Method: Tracking by ID')
-      token = queueArray.find(t => t.trackingId === id)
-      
-      if (!token) {
-        console.warn('[TRACKING ID NOT FOUND]', id)
-        return res.status(404).json({
-          error: 'Not Found',
-          message: 'Appointment not found with this tracking ID'
-        })
-      }
-    }
-    // Fallback to phone number if no tracking ID (backward compatibility)
-    else if (id || phone) {
-      const searchPhone = id || phone
-      console.log('  Method: Tracking by phone (legacy)')
+    if (phone) {
+      const searchPhone = phone
+      console.log('  Method: Tracking by phone')
       token = queueArray.find(t => t.phone === searchPhone)
       
       if (!token) {
@@ -363,7 +327,7 @@ export const trackQueue = async (req, res) => {
     else {
       return res.status(400).json({
         error: 'Bad Request',
-        message: 'Tracking ID or phone number required'
+        message: 'Phone number required'
       })
     }
 
@@ -372,7 +336,6 @@ export const trackQueue = async (req, res) => {
     const tokensAhead = queueArray.filter((t, idx) => idx < tokenIndex && t.status === 'waiting').length
 
     const trackingData = {
-      trackingId: token.trackingId,
       tokenNumber: token.tokenNumber,
       patient: token.name,
       phone: token.phone,
@@ -388,7 +351,6 @@ export const trackQueue = async (req, res) => {
 
     console.log('[QUEUE TRACKED]', {
       tokenNumber: token.tokenNumber,
-      trackingId: token.trackingId,
       status: token.status,
       tokensAhead,
       position: tokenIndex + 1
@@ -760,7 +722,7 @@ export const moveQueueForward = async (req, res) => {
         currentToken: nextWaitingToken.tokenNumber,
         patient: nextWaitingToken.name,
         phone: nextWaitingToken.phone,
-        reason: nextWaitingToken.reason,
+        reason: nextWaiting.reason,
         clinic: nextWaitingToken.clinic,
         waiting: waitingCount,
         estimatedTime: `${estimatedTime} mins`,

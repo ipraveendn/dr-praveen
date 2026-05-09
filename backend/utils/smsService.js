@@ -202,29 +202,7 @@ export async function sendAppointmentSMS(phone, patientName, token, waitTime, re
     console.log('  Tracking URL:', trackingUrl || 'Not provided')
 
     // Format message exactly as specified
-    let message = `Hi ${patientName},
-
-Your appointment token at Dr. Praveen's DiaPlus Clinic:
-
-Token: ${token}
-Clinic: DiaPlus
-Estimated Wait: ${waitTime} mins
-Reason: ${reason}
-
-Please keep your token safe. You'll receive updates when it's your turn.`
-
-    // Add tracking link if provided
-    if (trackingUrl) {
-      message += `
-
-Track your live appointment status:
-${trackingUrl}`
-    }
-
-    message += `
-
-Dr. Praveen Ramachandra
-Endocrinologist`
+    let message = `Hi ${patientName}, your token is ${token}. Track your position: ${trackingUrl}. - Dr. Praveen Ramachandra`
 
     console.log('\n[MESSAGE CONTENT]')
     console.log(message)

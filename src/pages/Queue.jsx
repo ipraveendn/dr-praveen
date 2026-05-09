@@ -6,15 +6,6 @@ import { createPaymentOrder, verifyPayment, simulateRazorpayPayment } from '../u
 
 const REASONS = ['Diabetes Checkup','Thyroid Consultation','Hormone Imbalance','Obesity/Weight','PCOS / PCOD','Gestational Diabetes','Pediatric Endocrinology','Osteoporosis','Adrenal Disorder','Pituitary Disorder','General Consultation','Other']
 
-async function sendSMS(phone, name, token, clinic) {
-  const key = import.meta.env.VITE_FAST2SMS_KEY
-  if (!key) return
-  const msg = `Hi ${name}, your token is #${String(token).padStart(2,'0')} at ${clinic}. Track your position: ${window.location.origin}/track?phone=${phone}. - Dr. Praveen Ramachandra`
-  try {
-    await fetch(`https://www.fast2sms.com/dev/bulkV2?authorization=${key}&route=q&message=${encodeURIComponent(msg)}&language=english&flash=0&numbers=${phone}`)
-  } catch {}
-}
-
 export default function Queue() {
   const [step, setStep]     = useState(1)
   const [clinic, setClinic] = useState('')
@@ -100,7 +91,8 @@ export default function Queue() {
           name: form.name,
           phone: form.phone,
           reason: form.reason,
-          clinic: clinic
+          clinic: clinic,
+          trackingUrl: `${window.location.origin}/track?phone=${form.phone}`
         })
       })
 
@@ -111,7 +103,6 @@ export default function Queue() {
       }
 
       const tokenNum = result.data.tokenNumber
-      await sendSMS(form.phone, form.name, tokenNum, clinic)
       setToken(tokenNum)
       setStep(5) // Final success screen
     } catch (e) {
@@ -339,4 +330,4 @@ export default function Queue() {
       </div>
     </>
   )
-}                 
+}

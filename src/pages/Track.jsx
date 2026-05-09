@@ -1,18 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Helmet } from 'react-helmet-async'
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore'
-import { db } from '../firebase/config'
 import { DOCTOR } from '../data/content'
 import { apiRequest } from '../utils/api'
 
 export default function Track() {
-  // Extract tracking ID from URL path or query params
-  const pathParts = window.location.pathname.split('/')
-  const urlTrackingId = pathParts[pathParts.length - 1]
-  
   const params = new URLSearchParams(window.location.search)
   const [phone, setPhone] = useState(params.get('phone') || '')
-  const [trackingId, setTrackingId] = useState(urlTrackingId?.startsWith('TRK-') ? urlTrackingId : '')
   
   const [data, setData] = useState(null)
   const [ahead, setAhead] = useState(0)
@@ -43,24 +36,18 @@ export default function Track() {
   }
 
   /**
-   * Track appointment by tracking ID (new backend API)
+   * Track appointment by phone number
    */
-  async function trackByTrackingId(id) {
-    const trackId = id || trackingId
-    if (!trackId) { setError('Tracking ID is required'); return }
+  async function trackByPhone(ph) {
+    const p = ph || phone
+    if (!p || p.length < 10) { setError('Enter a valid 10-digit phone number'); return }
     
-    setLoading(true); setError(''); setData(null)
+    setLoading(true); setError('');
     try {
-      console.log('[TRACK BY ID]', trackId)
+      console.log('[TRACK BY PHONE]', p)
       
-      // Call new backend API with tracking ID
-      const response = await fetch(`https://dr-praveen.onrender.com/api/queue/track/${trackId}`)
-      
-      if (!response.ok) {
-        throw new Error('Appointment not found. Please check your tracking link.')
-      }
-      
-      const result = await response.json()
+      // Call new backend API with phone number
+      const result = await apiRequest(`/queue/track?phone=${p}`)
       
       if (result.success) {
         console.log('[TRACKING DATA]', result.data)
@@ -71,85 +58,42 @@ export default function Track() {
         setAhead(result.data.tokensAhead || 0)
         await fetchQueueStatus()
       } else {
+        setData(null)
         throw new Error(result.message || 'Failed to fetch tracking data')
       }
     } catch (err) {
       console.error('[TRACKING ERROR]', err)
-      setError(err.message || 'Unable to fetch appointment details')
+      setData(null)
+      setError(err.message || 'Unable to fetch appointment details. Please make sure you have booked a token today.')
     }
     setLoading(false)
   }
 
   /**
-   * Track appointment by phone (legacy method)
-   */
-  async function trackByPhone(ph) {
-    const p = ph || phone
-    if (!p || p.length < 10) { setError('Enter a valid phone number'); return }
-    
-    setLoading(true); setError(''); setData(null)
-    try {
-      const today = new Date().toDateString()
-      const q = query(collection(db, 'patients'), where('phone', '==', p), where('date', '==', today))
-      const snap = await getDocs(q)
-      if (snap.empty) { 
-        setError('No token found for this number today. Please book a token first.'); 
-        setLoading(false)
-        return 
-      }
-      const patient = { id: snap.docs[0].id, ...snap.docs[0].data() }
-
-      // Count waiting patients ahead
-      const qAhead = query(collection(db, 'patients'), where('clinicId', '==', patient.clinicId), where('date', '==', today), where('status', '==', 'waiting'))
-      const snapAhead = await getDocs(qAhead)
-      const waitingAhead = snapAhead.docs.filter(d => d.data().tokenNumber < patient.tokenNumber).length
-      setAhead(waitingAhead)
-      setData(patient)
-      
-      // Fetch queue status from backend
-      await fetchQueueStatus()
-    } catch (err) {
-      console.error('[TRACK BY PHONE ERROR]', err)
-      setError('Something went wrong. Please try again.')
-    }
-    setLoading(false)
-  }
-
-  /**
-   * Handle tracking - either by ID or phone
+   * Handle tracking
    */
   function handleTrack() {
-    if (trackingId && trackingId.startsWith('TRK-')) {
-      trackByTrackingId(trackingId)
-    } else if (phone) {
+    if (phone) {
       trackByPhone(phone)
     } else {
-      setError('Please enter a phone number or use a valid tracking link')
+      setError('Please enter a phone number.')
     }
   }
 
   useEffect(() => { 
-    // If tracking ID is provided in URL, fetch immediately
-    if (trackingId && trackingId.startsWith('TRK-')) {
-      trackByTrackingId(trackingId)
-    } else if (params.get('phone')) {
+    if (params.get('phone')) {
       trackByPhone(params.get('phone'))
     }
-    // Fetch queue status on mount
     fetchQueueStatus()
   }, [])
 
   useEffect(() => {
     if (!data || !autoRefresh) return
     const t = setInterval(() => {
-      if (trackingId && trackingId.startsWith('TRK-')) {
-        trackByTrackingId(trackingId)
-      } else {
-        trackByPhone(phone)
-      }
+      trackByPhone(phone)
     }, 5000) // Refresh every 5 seconds
     return () => clearInterval(t)
-  }, [data, phone, trackingId, autoRefresh])
+  }, [data, phone, autoRefresh])
 
   const statusColor = { waiting: '#F59E0B', serving: '#0B7B6F', done: '#64748B' }
   const statusLabel = { 
@@ -190,13 +134,6 @@ export default function Track() {
               </>
             ) : (
               <>
-                {/* Tracking ID display */}
-                {data.trackingId && (
-                  <div style={{ background: '#F0FDF4', borderRadius: '12px', padding: '12px', marginBottom: '16px', border: '1px solid #BBEF63', fontSize: '11px', color: '#166534', textAlign: 'center', fontFamily: "'DM Sans',monospace" }}>
-                    ID: {data.trackingId}
-                  </div>
-                )}
-
                 {/* Token card */}
                 <div style={{ background: 'linear-gradient(135deg,#0B7B6F,#096358)', borderRadius: '18px', padding: '28px', textAlign: 'center', marginBottom: '20px' }}>
                   <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '6px' }}>Your Token</div>
@@ -240,7 +177,7 @@ export default function Track() {
                   <span>Auto-refresh every 5 seconds</span>
                 </label>
 
-                <button onClick={() => { setData(null); setPhone(''); setTrackingId(''); }} style={{ width: '100%', background: 'none', border: '1.5px solid #E2EEEC', borderRadius: '10px', padding: '12px', color: '#64748B', fontSize: '13px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Track Different Token</button>
+                <button onClick={() => { setData(null); setPhone(''); }} style={{ width: '100%', background: 'none', border: '1.5px solid #E2EEEC', borderRadius: '10px', padding: '12px', color: '#64748B', fontSize: '13px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Track Different Token</button>
               </>
             )}
           </div>
