@@ -1,0 +1,72 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// User model for admins and doctors
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  ADMIN
+  DOCTOR
+  USER
+}
+
+// Clinic model
+model Clinic {
+  id      String  @id @default(uuid())
+  name    String
+  address String
+  tokens  Token[]
+}
+
+// Patient model
+model Patient {
+  id     String  @id @default(uuid())
+  name   String
+  phone  String  @unique
+  email  String?
+  place  String?
+  tokens Token[]
+}
+
+// Token model
+model Token {
+  id               String      @id @default(uuid())
+
+  tokenNumber      Int
+  status           TokenStatus @default(WAITING)
+
+  reasonForVisit   String
+
+  appointmentDate  DateTime
+
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  clinicId         String
+  clinic           Clinic      @relation(fields: [clinicId], references: [id])
+
+  patientId        String
+  patient          Patient     @relation(fields: [patientId], references: [id])
+
+  @@unique([tokenNumber, appointmentDate])
+}
+
+enum TokenStatus {
+  WAITING
+  SERVING
+  COMPLETED
+  CANCELLED
+}
