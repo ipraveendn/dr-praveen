@@ -122,7 +122,6 @@ export const addToken = async (req, res) => {
   name,
   phone,
   reason,
-  reasonForVisit,
   clinic,
   trackingUrl
 } = req.body
@@ -225,21 +224,8 @@ try {
     const tokenRecord = await prisma.token.create({
       data: {
         tokenNumber: Number(tokenNumber),
-
-        reason: String(
-          reason ||
-          reasonForVisit ||
-          "General Consultation"
-        ),
-
-        reasonForVisit: String(
-          reasonForVisit ||
-          reason ||
-          "General Consultation"
-        ),
-
+        reason: String(reason || "General Consultation"),
         status: 'WAITING',
-
         clinicId: clinic_id,
         patientId: patient.id
       }
