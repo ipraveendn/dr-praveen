@@ -68,7 +68,7 @@ model Token {
 
   reason        String
   reasonForVisit String
-
+  appointmentDate DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
