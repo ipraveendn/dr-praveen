@@ -1,10 +1,43 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { CLINICS, DOCTOR } from '../data/content'
 import { apiRequest } from '../utils/api'
 import { createPaymentOrder, verifyPayment, simulateRazorpayPayment } from '../utils/payment'
 
 const REASONS = ['Diabetes Checkup','Thyroid Consultation','Hormone Imbalance','Obesity/Weight','PCOS / PCOD','Gestational Diabetes','Pediatric Endocrinology','Osteoporosis','Adrenal Disorder','Pituitary Disorder','General Consultation','Other']
+
+function LiveQueue({ data }) {
+  if (!data) return <p>Loading queue...</p>;
+
+  return (
+    <div style={{ background: '#fff', borderRadius: '20px', padding: '40px', boxShadow: '0 4px 24px rgba(11,123,111,0.08)', border: '1px solid #E2EEEC', marginTop: '48px' }}>
+      <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>Live Queue</h2>
+      <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '28px' }}>Current status of the queue</p>
+
+      <div style={{ display: 'flex', gap: '20px', marginBottom: '28px' }}>
+        <div style={{ flex: 1, background: '#F8FAFA', borderRadius: '14px', padding: '24px', border: '1px solid #E2EEEC' }}>
+          <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '8px' }}>Currently Serving</div>
+          <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '48px', fontWeight: '800', color: '#0B7B6F', lineHeight: '1' }}>#{String(data.currentToken).padStart(2, '0')}</div>
+        </div>
+        <div style={{ flex: 1, background: '#F8FAFA', borderRadius: '14px', padding: '24px', border: '1px solid #E2EEEC' }}>
+          <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '8px' }}>Waiting</div>
+          <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '48px', fontWeight: '800', color: '#0A1628', lineHeight: '1' }}>{data.waiting}</div>
+        </div>
+      </div>
+
+      <div>
+        <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '20px', fontWeight: '700', color: '#0A1628', marginBottom: '12px' }}>Upcoming Tokens</h3>
+        {data.patients.filter(p => p.status === 'WAITING').map((patient, index) => (
+          <div key={index} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #E2EEEC', fontSize: '14px' }}>
+            <span style={{ color: '#0A1628', fontWeight: '700' }}>#{String(patient.tokenNumber).padStart(2, '0')}</span>
+            <span style={{ color: '#64748B', fontWeight: '500' }}>{patient.name}</span>
+            <span style={{ color: '#0B7B6F', fontWeight: '600' }}>{patient.clinic}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function Queue() {
   const [step, setStep]     = useState(1)
@@ -13,10 +46,26 @@ export default function Queue() {
   const [token, setToken]   = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError]   = useState('')
+  const [queueData, setQueueData] = useState(null);
   
   // Payment states
   const [paymentOrder, setPaymentOrder] = useState(null)
   const [paymentStatus, setPaymentStatus] = useState(null) // 'processing', 'success', 'failed'
+
+  async function fetchQueueData() {
+    try {
+      const data = await apiRequest("/queue");
+      setQueueData(data.data);
+    } catch (error) {
+      console.error("Failed to fetch queue data:", error);
+    }
+  }
+
+  useEffect(() => {
+    fetchQueueData();
+    const interval = setInterval(fetchQueueData, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   /**
    * Create payment order before showing payment screen
@@ -385,6 +434,7 @@ export default function Queue() {
               </div>
             )}
           </div>
+          <LiveQueue data={queueData} />
         </div>
       </div>
     </>

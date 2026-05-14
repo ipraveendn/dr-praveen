@@ -8,7 +8,6 @@ export default function Track() {
   const [phone, setPhone] = useState(params.get('phone') || '')
   
   const [data, setData] = useState(null)
-  const [ahead, setAhead] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [autoRefresh, setAutoRefresh] = useState(true)
@@ -55,7 +54,6 @@ export default function Track() {
           ...result.data,
           clinicId: result.data.clinic?.toLowerCase() || 'diaplus'
         })
-        setAhead(result.data.tokensAhead || 0)
         await fetchQueueStatus()
       } else {
         setData(null)
@@ -95,13 +93,13 @@ export default function Track() {
     return () => clearInterval(t)
   }, [data, phone, autoRefresh])
 
-  const statusColor = { waiting: '#F59E0B', serving: '#0B7B6F', done: '#64748B' }
+  const statusColor = { WAITING: '#F59E0B', SERVING: '#0B7B6F', COMPLETED: '#64748B' }
   const statusLabel = { 
-    waiting: '⏳ Waiting', 
-    serving: '👨‍⚕️ Being Served', 
-    done: '✅ Done' 
+    WAITING: '⏳ Waiting', 
+    SERVING: '👨‍⚕️ Being Served', 
+    COMPLETED: '✅ Done' 
   }
-  const estWait = ahead * 10
+  const estWait = (data?.tokensAhead || 0) * 10
 
   return (
     <>
@@ -144,7 +142,7 @@ export default function Track() {
                 {/* Stats */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
                   <div style={{ background: '#F8FAFA', borderRadius: '12px', padding: '16px', textAlign: 'center', border: '1px solid #E2EEEC' }}>
-                    <div style={{ fontSize: '28px', fontWeight: '800', color: '#0B7B6F' }}>{ahead}</div>
+                    <div style={{ fontSize: '28px', fontWeight: '800', color: '#0B7B6F' }}>{data.tokensAhead}</div>
                     <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>Patients Ahead</div>
                   </div>
                   <div style={{ background: '#F8FAFA', borderRadius: '12px', padding: '16px', textAlign: 'center', border: '1px solid #E2EEEC' }}>
@@ -160,7 +158,7 @@ export default function Track() {
                     <span style={{ fontSize: '13px', fontWeight: '700', color: statusColor[data.status] || '#0B7B6F' }}>{statusLabel[data.status] || '⏳ Waiting'}</span>
                   </div>
                   <div style={{ height: '8px', background: '#E2EEEC', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', background: 'linear-gradient(90deg,#0B7B6F,#0FA898)', borderRadius: '4px', width: data.status === 'done' ? '100%' : data.status === 'serving' ? '80%' : `${Math.max(10, 100 - (ahead * 15))}%`, transition: 'width 0.5s ease' }}/>
+                    <div style={{ height: '100%', background: 'linear-gradient(90deg,#0B7B6F,#0FA898)', borderRadius: '4px', width: data.status === 'COMPLETED' ? '100%' : data.status === 'SERVING' ? '80%' : `${Math.max(10, 100 - ((data.tokensAhead || 0) * 15))}%`, transition: 'width 0.5s ease' }}/>
                   </div>
                 </div>
 

@@ -7,7 +7,6 @@ import { fileURLToPath } from 'url'
 import authRoutes from './routes/auth.js'
 import queueRoutes from './routes/queue.js'
 import paymentRoutes from './routes/payment.js'
-import { seedDemoQueue } from './controllers/queueController.js'
 
 // Get current directory for ES modules
 const __filename = fileURLToPath(import.meta.url)
@@ -228,7 +227,6 @@ const startServer = (port) => {
   const server = app.listen(port, () => {
     if (didError) return
 
-    seedDemoQueue()
     // Log exactly as requested
     console.log(`Server running on port ${port}`)
     console.log(`

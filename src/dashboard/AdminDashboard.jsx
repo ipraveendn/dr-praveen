@@ -43,9 +43,9 @@ export default function AdminDashboard() {
   }, [clinicId])
 
   const apiPatients = Array.isArray(queueData?.patients) ? queueData.patients : []
-  const waiting     = apiPatients.filter(p => p.status === 'waiting')
-  const serving     = apiPatients.find(p => p.status === 'serving')
-  const completed   = apiPatients.filter(p => p.status === 'done')
+  const waiting     = apiPatients.filter(p => p.status === 'waiting' || p.status === 'WAITING')
+  const serving     = apiPatients.find(p => p.status === 'serving' || p.status === 'SERVING')
+  const completed   = apiPatients.filter(p => p.status === 'done' || p.status === 'COMPLETED')
   const revenue     = completed.length * 500
 
   async function addPatient() {
@@ -64,15 +64,14 @@ export default function AdminDashboard() {
   }
 
   async function callNext() {
-    await apiRequest('/queue/next', { method: 'POST' })
+    await apiRequest('/queue/next', { method: 'POST', body: JSON.stringify({ clinic: clinicId }) })
   }
 
   async function markDone() {
     if (!serving?.tokenNumber || completeLoading) return
     setCompleteLoading(true)
     try {
-      const json = await apiRequest(`/queue/complete/${serving.tokenNumber}`, { method: 'PATCH' })
-      setQueueData(json?.data ?? null)
+      await apiRequest(`/queue/complete/${serving.tokenNumber}`, { method: 'PATCH' })
     } catch (e) {
       console.error(e)
     } finally {
@@ -279,13 +278,13 @@ export default function AdminDashboard() {
                 <div key={p.tokenNumber} style={{
                   padding: '14px 20px', borderBottom: '1px solid #F0F4F4',
                   display: 'flex', alignItems: 'center', gap: '14px',
-                  background: p.status === 'serving' ? '#E6F4F2' : '#fff',
+                  background: (p.status === 'serving' || p.status === 'SERVING') ? '#E6F4F2' : '#fff',
                 }}>
                   <div style={{
                     width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
-                    background: p.status === 'serving' ? 'linear-gradient(135deg,#0B7B6F,#096358)' : p.status === 'done' ? '#E2EEEC' : '#E6F4F2',
+                    background: (p.status === 'serving' || p.status === 'SERVING') ? 'linear-gradient(135deg,#0B7B6F,#096358)' : (p.status === 'done' || p.status === 'COMPLETED') ? '#E2EEEC' : '#E6F4F2',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontWeight: '800', color: p.status === 'serving' ? '#fff' : '#0B7B6F', fontSize: '13px',
+                    fontWeight: '800', color: (p.status === 'serving' || p.status === 'SERVING') ? '#fff' : '#0B7B6F', fontSize: '13px',
                   }}>
                     {String(p.tokenNumber).padStart(2, '0')}
                   </div>
@@ -297,12 +296,12 @@ export default function AdminDashboard() {
                   </div>
                   <span style={{
                     padding: '3px 10px', borderRadius: '20px', fontSize: '10px', fontWeight: '700', flexShrink: 0,
-                    background: p.status === 'serving' ? '#0B7B6F' : p.status === 'done' ? '#E2EEEC' : '#FEF3C7',
-                    color: p.status === 'serving' ? '#fff' : p.status === 'done' ? '#64748B' : '#92400E',
+                    background: (p.status === 'serving' || p.status === 'SERVING') ? '#0B7B6F' : (p.status === 'done' || p.status === 'COMPLETED') ? '#E2EEEC' : '#FEF3C7',
+                    color: (p.status === 'serving' || p.status === 'SERVING') ? '#fff' : (p.status === 'done' || p.status === 'COMPLETED') ? '#64748B' : '#92400E',
                   }}>
-                    {p.status === 'serving' ? 'Serving' : p.status === 'done' ? 'Done' : 'Waiting'}
+                    {(p.status === 'serving' || p.status === 'SERVING') ? 'Serving' : (p.status === 'done' || p.status === 'COMPLETED') ? 'Done' : 'Waiting'}
                   </span>
-                  {p.status === 'waiting' && (
+                  {(p.status === 'waiting' || p.status === 'WAITING') && (
                     <button onClick={() => removePatient(p.tokenNumber)} style={{
                       background: 'none', border: '1px solid #E2EEEC', borderRadius: '6px',
                       color: '#94A3B8', cursor: 'pointer', fontSize: '11px',
