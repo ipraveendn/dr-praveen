@@ -10,21 +10,12 @@ const prisma = new PrismaClient();
 // == HELPER FUNCTIONS
 // =================================================================================================
 
-/**
- * Gets the start of the current day in UTC.
- * @returns {Date} - The start of the day (00:00:00 UTC).
- */
 const getStartOfDay = () => {
   const now = new Date();
-  // Using UTC for consistency across servers/timezones.
   now.setUTCHours(0, 0, 0, 0);
   return now;
 };
 
-/**
- * Gets the end of the current day in UTC.
- * @returns {Date} - The end of the day (23:59:59 UTC).
- */
 const getEndOfDay = () => {
   const now = new Date();
   now.setUTCHours(23, 59, 59, 999);
@@ -36,71 +27,59 @@ const getEndOfDay = () => {
 // == CORE QUEUE LOGIC
 // =================================================================================================
 
-/**
- * Add new token to the queue for a specific clinic for the current day.
- * This is the primary function for booking a new token.
- * It safely handles patient creation and sequential token numbering per clinic, per day.
- */
 export const addToken = async (req, res) => {
   console.log("[addToken] STEP 1: Request received for new token.");
   const { name, phone, email, place, reason, clinic, trackingUrl } = req.body;
 
-  // 1. Validate Input
   if (!name || !phone || !reason || !clinic) {
     console.error("[addToken] FAIL: Missing required fields.");
-    return res.status(400).json({
-      success: false,
-      message: "name, phone, reason, and clinic are required fields.",
-    });
+    return res.status(400).json({ success: false, message: "name, phone, reason, and clinic are required fields." });
   }
 
   try {
     const todayStart = getStartOfDay();
     const todayEnd = getEndOfDay();
 
-    // 2. Find or create the clinic record safely.
     console.log(`[addToken] STEP 2: Upserting clinic: ${clinic}`);
     const clinicRecord = await prisma.clinic.upsert({
       where: { name: clinic },
       update: {},
       create: { name: clinic, address: 'Address not specified' },
     });
-    console.log(`[addToken] Clinic ID: ${clinicRecord.id}`);
 
-    // 3. Find or create the patient record safely.
     console.log(`[addToken] STEP 3: Upserting patient with phone: ${phone}`);
     const patient = await prisma.patient.upsert({
       where: { phone: String(phone) },
       update: { name, email, place },
       create: { name, phone: String(phone), email, place },
     });
-    console.log(`[addToken] Patient ID: ${patient.id}`);
     
-    // 4. Find the last token for THIS clinic and THIS day to determine the next token number.
+    // DEBUG LOG as requested
+    console.log("PATIENT OBJECT =", patient);
+
+    // SAFETY GUARD as requested
+    if (!patient || !patient.id) {
+        console.error("[addToken] FATAL: Patient object or patient.id is missing after upsert.");
+        return res.status(500).json({ success: false, message: "Failed to create patient record. Cannot proceed." });
+    }
+
     console.log(`[addToken] STEP 4: Fetching last token for clinicId ${clinicRecord.id} today.`);
     const lastToken = await prisma.token.findFirst({
       where: {
         clinicId: clinicRecord.id,
-        appointmentDate: {
-          gte: todayStart,
-          lte: todayEnd,
-        },
+        appointmentDate: { gte: todayStart, lte: todayEnd },
       },
-      orderBy: {
-        tokenNumber: 'desc',
-      },
+      orderBy: { tokenNumber: 'desc' },
     });
-    console.log("[addToken] Last token found:", lastToken);
 
     const nextTokenNumber = lastToken ? lastToken.tokenNumber + 1 : 1;
     console.log(`[addToken] STEP 5: Next token number is ${nextTokenNumber}.`);
 
-    // 5. Create the new token.
     console.log("[addToken] STEP 6: Creating the new token in the database.");
     const tokenRecord = await prisma.token.create({
       data: {
         tokenNumber: nextTokenNumber,
-        patientId: patient.id,
+        patientId: patient.id, // Corrected based on standard Prisma return
         clinicId: clinicRecord.id,
         reasonForVisit: reason,
         status: 'WAITING',
@@ -109,55 +88,49 @@ export const addToken = async (req, res) => {
     });
     console.log("[addToken] STEP 7: Token created successfully:", tokenRecord);
 
-    // 6. Send SMS notification (non-blocking).
     const waitingCount = await prisma.token.count({ where: { status: 'WAITING', clinicId: clinicRecord.id, appointmentDate: { gte: todayStart, lte: todayEnd } } });
     const estimatedTime = (waitingCount - 1) * 5;
     sendTokenNotificationSMS({
         name, phone, tokenNumber: nextTokenNumber, clinic, reason, estimatedTime: `${estimatedTime} mins`, trackingUrl
     }).catch(smsError => console.error("[addToken] SMS sending failed:", smsError));
     
-    // 7. Send final success response.
     console.log("[addToken] STEP 8: Sending success response to client.");
-    return res.status(201).json({
-      success: true,
-      data: { tokenNumber: nextTokenNumber, patient: name, clinic },
-      message: "Token created successfully.",
-    });
+    return res.status(201).json({ success: true, data: { tokenNumber: nextTokenNumber, patient: name, clinic }, message: "Token created successfully." });
 
   } catch (error) {
     console.error("[addToken] FATAL ERROR:", error);
-    return res.status(500).json({
-      success: false,
-      message: "An internal server error occurred during token creation.",
-      error: error.message,
-    });
+    return res.status(500).json({ success: false, message: "An internal server error occurred during token creation.", error: error.message });
   }
 };
 
-/**
- * Get current queue data for a specific clinic for the current day.
- */
 export const getQueueData = async (req, res) => {
   const { clinic } = req.query;
-  if (!clinic) {
-    return res.status(400).json({ success: false, message: "Clinic query parameter is required." });
-  }
 
   try {
     const todayStart = getStartOfDay();
     const todayEnd = getEndOfDay();
 
-    const clinicRecord = await prisma.clinic.findUnique({ where: { name: clinic } });
-    if (!clinicRecord) {
-      return res.status(404).json({ success: false, message: `Clinic \"${clinic}\" not found.` });
+    // Build the where clause to optionally filter by clinic
+    let whereClause = {
+        appointmentDate: {
+            gte: todayStart,
+            lte: todayEnd,
+        },
+    };
+
+    if (clinic) {
+        const clinicRecord = await prisma.clinic.findUnique({ where: { name: clinic } });
+        if (clinicRecord) {
+            whereClause.clinicId = clinicRecord.id;
+        } else {
+             // If clinic is specified but not found, return empty set for that clinic
+             return res.status(200).json({ success: true, data: { currentToken: null, waiting: 0, estimatedTime: '0 mins', patients: [] } });
+        }
     }
 
     const tokens = await prisma.token.findMany({
-      where: {
-        clinicId: clinicRecord.id,
-        appointmentDate: { gte: todayStart, lte: todayEnd },
-      },
-      include: { patient: true },
+      where: whereClause,
+      include: { patient: true, clinic: true }, // Include clinic for name
       orderBy: { tokenNumber: 'asc' },
     });
 
@@ -170,7 +143,14 @@ export const getQueueData = async (req, res) => {
         currentToken: servingToken ? servingToken.tokenNumber : null,
         waiting: waitingTokens.length,
         estimatedTime: `${waitingTokens.length * 5} mins`,
-        patients: tokens.map(t => ({ tokenNumber: t.tokenNumber, name: t.patient.name, status: t.status, phone: t.patient.phone, reason: t.reasonForVisit })),
+        patients: tokens.map(t => ({
+            tokenNumber: t.tokenNumber,
+            name: t.patient.name,
+            status: t.status,
+            clinic: t.clinic.name, // Add clinic name to patient data
+            phone: t.patient.phone,
+            reason: t.reasonForVisit
+        })),
       }
     });
   } catch (error) {
@@ -179,9 +159,6 @@ export const getQueueData = async (req, res) => {
   }
 };
 
-/**
- * Track a patient's token by their phone number for the current day.
- */
 export const trackQueue = async (req, res) => {
   const { phone } = req.query;
   if (!phone) {
@@ -231,9 +208,6 @@ export const trackQueue = async (req, res) => {
   }
 };
 
-/**
- * Calls the next patient in the queue for a specific clinic.
- */
 export const callNextPatient = async (req, res) => {
   const { clinic } = req.body;
   if (!clinic) {
@@ -272,9 +246,6 @@ export const callNextPatient = async (req, res) => {
   }
 };
 
-/**
- * Manually mark a specific token as complete.
- */
 export const completeConsultationByTokenNumber = async (req, res) => {
     const tokenNumber = Number(req.params.tokenNumber);
     if (!tokenNumber || isNaN(tokenNumber)) {
@@ -303,10 +274,6 @@ export const completeConsultationByTokenNumber = async (req, res) => {
     }
 };
 
-/**
- * Restores the getQueueStatus function to prevent deployment crashes.
- * This is a temporary measure to ensure the API route remains available.
- */
 export const getQueueStatus = async (req, res) => {
   try {
     const queue = await prisma.token.findMany({
