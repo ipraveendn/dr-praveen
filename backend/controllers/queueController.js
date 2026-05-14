@@ -84,6 +84,7 @@ export const addToken = async (req, res) => {
         tokenNumber: nextTokenNumber,
         patientId: patient.id, // Corrected based on standard Prisma return
         clinicId: clinicRecord.id,
+        reason : reason,
         reasonForVisit: reason,
         status: 'WAITING',
         appointmentDate: new Date(),
