@@ -40,11 +40,13 @@ model Patient {
   name        String
   phone       String   @unique
   email       String?
+  place       String?
   age         Int
   gender      String
   reason      String
 
   clinicId    String
+  clinicName  String?
   clinic      Clinic @relation(fields: [clinicId], references: [id])
 
   tokens      Token[]

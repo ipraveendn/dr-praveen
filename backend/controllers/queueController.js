@@ -121,6 +121,8 @@ export const addToken = async (req, res) => {
     const {
   name,
   phone,
+  email,
+  place,
   reason,
   clinic,
   trackingUrl
@@ -199,17 +201,19 @@ try {
       
       // Generate unique patientId
       const patientId = `PAT_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-
+      const clinic = await prisma.clinic.findUnique({ where: { id: clinic_id } }) 
       patient = await prisma.patient.create({
         data: {
           patientId: patientId,
           name: String(name),
           phone: String(phone),
-          email: null,
+          email: email ? String(email) : null,
+          place: place ? String(place) : null,
           age: 0,  // Default age since not provided
           gender: 'Not Specified',  // Default gender
           reason: String(reason),
-          clinicId: clinic_id
+          clinicId: clinic_id,
+          clinicName: clinic?.name || "Unknown Clinic"
         }
       })
       
@@ -357,7 +361,7 @@ export const bookToken = async (req, res) => {
   try {
     // For this project, "book token" is the same as creating a new token entry.
     // Keep a dedicated endpoint for frontend compatibility.
-    const { name, phone, reason, clinic } = req.body
+    const { name, phone, email, place, reason, clinic } = req.body
 
     if (!name || !phone || !reason || !clinic) {
       return res.status(400).json({
