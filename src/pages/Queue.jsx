@@ -9,7 +9,7 @@ const REASONS = ['Diabetes Checkup','Thyroid Consultation','Hormone Imbalance','
 export default function Queue() {
   const [step, setStep]     = useState(1)
   const [clinic, setClinic] = useState('')
-  const [form, setForm]     = useState({ name: '', phone: '', doctor: 'Dr. Praveen Ramachandra', reason: '' })
+  const [form, setForm]     = useState({ name: '', phone: '', email: '', place: '', doctor: 'Dr. Praveen Ramachandra', reason: '' })
   const [token, setToken]   = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError]   = useState('')
@@ -109,6 +109,8 @@ export default function Queue() {
       const requestBody = {
         name: form.name,
         phone: form.phone,
+        email: form.email,
+        place: form.place,
         reason: form.reason,
         clinic: clinic,
         trackingUrl: `${window.location.origin}/track?phone=${form.phone}`
@@ -225,10 +227,8 @@ export default function Queue() {
                   { label: 'Full Name *', key: 'name', type: 'text', placeholder: 'Enter your full name' },
                   { label: 'Phone Number *', key: 'phone', type: 'tel', placeholder: '10-digit mobile number' },
                   { label: 'Email Address', key: 'email', type: 'email', placeholder: 'Enter your email address' },
-                { label: 'Place', key: 'place', type: 'place', placeholder: 'Enter your address' },
-                  
+                  { label: 'Place', key: 'place', type: 'text', placeholder: 'Enter your city or town' },
                 ].map(f => (
-                    
                   <div key={f.key} style={{ marginBottom: '20px' }}>
                     <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#0B7B6F', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px' }}>{f.label}</label>
                     <input type={f.type} placeholder={f.placeholder} value={form[f.key]} maxLength={f.key === 'phone' ? 10 : undefined}
@@ -262,7 +262,15 @@ export default function Queue() {
             {step === 3 && (
               <div>
                 <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628', marginBottom: '24px' }}>Confirm Details</h2>
-                {[['Clinic', clinicObj?.name], ['Name', form.name], ['Phone', form.phone], ['Reason', form.reason], ['Doctor', form.doctor]].map(([label, val]) => (
+                {[
+                  ['Clinic', clinicObj?.name], 
+                  ['Name', form.name], 
+                  ['Phone', form.phone], 
+                  form.email && ['Email', form.email], 
+                  form.place && ['Place', form.place], 
+                  ['Reason', form.reason], 
+                  ['Doctor', form.doctor]
+                ].filter(Boolean).map(([label, val]) => (
                   <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #E2EEEC', fontSize: '14px' }}>
                     <span style={{ color: '#64748B', fontWeight: '500' }}>{label}</span>
                     <span style={{ color: '#0A1628', fontWeight: '700' }}>{val}</span>
@@ -373,7 +381,7 @@ export default function Queue() {
                   <p style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>Your token number and live tracking link have been sent.</p>
                 </div>
                 <a href={`/track?phone=${form.phone}`} className="btn-primary" style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px', textDecoration: 'none' }}> Track My Position Live</a>
-                <button onClick={() => { setStep(1); setToken(null); setPaymentOrder(null); setPaymentStatus(null); setForm({ name:'',phone:'',doctor:'Dr. Praveen Ramachandra',reason:'' }); setClinic(''); }} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '13px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Book Another Token</button>
+                <button onClick={() => { setStep(1); setToken(null); setPaymentOrder(null); setPaymentStatus(null); setForm({ name:'',phone:'',doctor:'Dr. Praveen Ramachandra',reason:'',email:'',place:'' }); setClinic(''); }} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '13px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Book Another Token</button>
               </div>
             )}
           </div>
