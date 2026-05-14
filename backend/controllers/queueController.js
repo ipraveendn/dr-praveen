@@ -118,7 +118,14 @@ export const getQueueData = async (req, res) => {
  */
 export const addToken = async (req, res) => {
   try {
-    const { name, phone, reason, clinic, trackingUrl } = req.body
+    const {
+  name,
+  phone,
+  reason,
+  reasonForVisit,
+  clinic,
+  trackingUrl
+} = req.body
     console.log("CLINIC RECEIVED:", clinic)
     console.log("TRACKING URL FROM FRONTEND:", trackingUrl);
 
@@ -218,7 +225,11 @@ try {
     const tokenRecord = await prisma.token.create({
       data: {
         tokenNumber: Number(tokenNumber),
-        reason: String(reason),
+        reasonForVisit: String(
+          reasonForVisit ||
+          reason ||
+          "General Consultation"
+        ),
         status: 'WAITING',
 
         clinicId: clinic_id,
