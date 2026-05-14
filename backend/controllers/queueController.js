@@ -1,8 +1,8 @@
 // Queue Controller
 // Handles queue management, token booking, and queue tracking
 
-import { sendTokenNotificationSMS } from '../utils/smsService.js'
-import { PrismaClient } from '@prisma/client'
+import { sendTokenNotificationSMS } from \'../utils/smsService.js\'
+import { PrismaClient } from \'@prisma/client\'
 
 const prisma = new PrismaClient()
 
@@ -23,16 +23,17 @@ export const getQueueData = async (req, res) => {
         }
       },
       include: {
-        patient: true
+        patient: true,
+        clinic: true
       }
     });
 
-    const waitingTokens = tokens.filter(token => token.status === 'WAITING')
+    const waitingTokens = tokens.filter(token => token.status === \'WAITING\')
     const waitingCount = waitingTokens.length
 
     const estimatedTime = waitingCount * 5
 
-    const serving = tokens.find(token => token.status === 'SERVING')
+    const serving = tokens.find(token => token.status === \'SERVING\')
     const currentToken = serving
       ? serving.tokenNumber
       : (tokens.length > 0 ? tokens[0].tokenNumber : 0)
@@ -56,11 +57,11 @@ export const getQueueData = async (req, res) => {
     res.status(200).json({
       success: true,
       data: queueData,
-      message: 'Queue data retrieved'
+      message: \'Queue data retrieved\'
     })
   } catch (error) {
     res.status(500).json({
-      error: 'Internal Server Error',
+      error: \'Internal Server Error\',
       message: error.message
     })
   }
@@ -73,6 +74,7 @@ export const getQueueData = async (req, res) => {
  * @param {Object} res - Express response object
  */
 export const addToken = async (req, res) => {
+    console.log("[STEP 1] Request received");
   try {
     const {
   name,
@@ -87,98 +89,92 @@ export const addToken = async (req, res) => {
     // Validate required fields
     if (!name || !phone || !reason || !clinic) {
       return res.status(400).json({
-        error: 'Bad Request',
-        message: 'name, phone, reason, and clinic are required',
-        required: ['name', 'phone', 'reason', 'clinic']
+        error: \'Bad Request\',
+        message: \'name, phone, reason, and clinic are required\',
+        required: [\'name\', \'phone\', \'reason\', \'clinic\']
       })
     }
 
+    console.log("[STEP 2] Fetching last token");
     const lastToken = await prisma.token.findFirst({
       orderBy: {
         tokenNumber: "desc"
       }
     });
+    console.log("[STEP 3] Last token =", lastToken);
 
     const nextTokenNumber = lastToken
       ? lastToken.tokenNumber + 1
       : 1;
+    console.log("[STEP 4] Next token number =", nextTokenNumber);
 
-try {
+    let patient;
+    let clinicRecord;
+    let clinic_id;
 
-    let patient = await prisma.patient.findUnique({
-      where: {
-        phone: String(phone)
+    try {
+      console.log("[DB] Finding or creating patient and clinic");
+      patient = await prisma.patient.findUnique({
+        where: { phone: String(phone) }
+      });
+
+      clinicRecord = await prisma.clinic.findUnique({
+        where: { name: String(clinic) }
+      });
+
+      if (clinicRecord) {
+        clinic_id = clinicRecord.id;
+      } else {
+        const newClinic = await prisma.clinic.create({
+          data: {
+            name: String(clinic),
+            address: \'Default Address\'
+          }
+        });
+        clinic_id = newClinic.id;
       }
-    })
 
-    const clinicRecord = await prisma.clinic.findUnique({
-      where: {
-        name: String(clinic)
+      if (!patient) {
+        patient = await prisma.patient.create({
+          data: {
+            name: String(name),
+            phone: String(phone),
+            email: email ? String(email) : null,
+            place: place ? String(place) : null,
+          }
+        });
       }
-    })
-    
-    let clinic_id = null
-    
-    if (clinicRecord) {
-      clinic_id = clinicRecord.id
-    } else {
-      const newClinic = await prisma.clinic.create({
-        data: {
-          name: String(clinic),
-          address: 'Default Address'
-        }
-      })
-      clinic_id = newClinic.id
+    } catch (dbError) {
+        console.error("[DB ERROR] ", dbError);
+        return res.status(500).json({
+            success: false,
+            message: "Database operation failed",
+            error: dbError.message
+        });
     }
 
-    if (!patient) {
-      // Generate unique patientId
-      const patientId = `PAT_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-      const clinic = await prisma.clinic.findUnique({ where: { id: clinic_id } }) 
-      patient = await prisma.patient.create({
-        data: {
-          patientId: patientId,
-          name: String(name),
-          phone: String(phone),
-          email: email ? String(email) : null,
-          place: place ? String(place) : null,
-          age: 0,  // Default age since not provided
-          gender: 'Not Specified',  // Default gender
-          reason: String(reason),
-          clinicId: clinic_id,
-          clinicName: clinic?.name || "Unknown Clinic"
-        }
-      })
-    }
 
+    console.log("[STEP 5] Creating token");
     const tokenRecord = await prisma.token.create({
       data: {
         tokenNumber: nextTokenNumber,
         reasonForVisit: String(reason || "General Consultation"),
         status: 'WAITING',
         clinicId: clinic_id,
-        patientId: patient.id
+        patientId: patient.id,
+        appointmentDate: new Date()
       }
-    })
+    });
+    console.log("[STEP 6] Token created =", tokenRecord);
 
-} catch (dbError) {
-
-  return res.status(500).json({
-    success: false,
-    error: 'Database insert failed',
-    details: dbError.message
-  })
-}
-    // Calculate estimated wait time
-    const waitingPatients = await prisma.token.count({ where: { status: 'WAITING' } })
+    const waitingPatients = await prisma.token.count({ where: { status: \'WAITING\' } });
     const estimatedTime = `${waitingPatients * 5} mins`
 
-    // ========== SEND SMS NOTIFICATION ==========
-    let smsResult = { success: false, error: 'SMS not sent' }
+    // ========== SEND SMS NOTIFICATION ==========\
+    let smsResult = { success: false, error: \'SMS not sent\' }
 
-    // Validate phone number before sending SMS
-    if (!phone || phone.toString().trim() === '') {
-      console.error('[PHONE NUMBER MISSING] Cannot send SMS without patient phone number')
+    if (!phone || phone.toString().trim() === \'\') {
+      console.error(\'[PHONE NUMBER MISSING] Cannot send SMS without patient phone number\')
     } else {
       
       const smsPayload = {
@@ -192,7 +188,6 @@ try {
       }
       
       try {
-        // Send SMS and wait for result
         smsResult = await sendTokenNotificationSMS(smsPayload)
         
       } catch (err) {
@@ -203,6 +198,7 @@ try {
       }
     }
 
+    console.log("[STEP 7] Sending response");
     res.status(201).json({
       success: true,
       data: {
@@ -215,15 +211,15 @@ try {
         trackingUrl
       },
       sms: smsResult,
-      message: 'Token created successfully'
+      message: \'Token created successfully\'
     })
   } catch (error) {
-    res.status(500).json({
+    console.error("[TOKEN ERROR]", error);
+    return res.status(500).json({
       success: false,
-      error: 'Internal Server Error',
-      message: error.message,
-      code: error.code || 'UNKNOWN_ERROR'
-    })
+      message: "Token generation failed",
+      error: error.message
+    });
   }
 }
 
@@ -240,9 +236,9 @@ export const bookToken = async (req, res) => {
 
     if (!name || !phone || !reason || !clinic) {
       return res.status(400).json({
-        error: 'Bad Request',
-        message: 'name, phone, reason, and clinic are required',
-        required: ['name', 'phone', 'reason', 'clinic']
+        error: \'Bad Request\',
+        message: \'name, phone, reason, and clinic are required\',
+        required: [\'name\', \'phone\', \'reason\', \'clinic\']
       })
     }
 
@@ -265,11 +261,11 @@ export const bookToken = async (req, res) => {
         phone,
         reason
       },
-      message: 'Token booked successfully'
+      message: \'Token booked successfully\'
     })
   } catch (error) {
     res.status(500).json({
-      error: 'Internal Server Error',
+      error: \'Internal Server Error\',
       message: error.message
     })
   }
@@ -302,22 +298,22 @@ export const trackQueue = async (req, res) => {
       
       if (!token) {
         return res.status(404).json({
-          error: 'Not Found',
-          message: 'Token not found for this phone number'
+          error: \'Not Found\',
+          message: \'Token not found for this phone number\'
         })
       }
     }
     else {
       return res.status(400).json({
-        error: 'Bad Request',
-        message: 'Phone number required'
+        error: \'Bad Request\',
+        message: \'Phone number required\'
       })
     }
 
     // Count how many tokens are ahead in the queue
     const tokensAhead = await prisma.token.count({
       where: {
-        status: 'WAITING',
+        status: \'WAITING\',
         tokenNumber: {
           lt: token.tokenNumber
         }
@@ -341,11 +337,11 @@ export const trackQueue = async (req, res) => {
     res.status(200).json({
       success: true,
       data: trackingData,
-      message: 'Queue tracking data retrieved'
+      message: \'Queue tracking data retrieved\'
     })
   } catch (error) {
     res.status(500).json({
-      error: 'Internal Server Error',
+      error: \'Internal Server Error\',
       message: error.message
     })
   }
@@ -368,8 +364,8 @@ export const getQueueStatus = async (req, res) => {
         }
       }
     });
-    const waitingCount = clinicTokens.filter(t => t.status === 'WAITING').length
-    const servingToken = clinicTokens.find(t => t.status === 'SERVING')
+    const waitingCount = clinicTokens.filter(t => t.status === \'WAITING\').length
+    const servingToken = clinicTokens.find(t => t.status === \'SERVING\')
 
     const statusData = {
       clinic: clinicId,
@@ -382,11 +378,11 @@ export const getQueueStatus = async (req, res) => {
     res.status(200).json({
       success: true,
       data: statusData,
-      message: 'Queue status retrieved'
+      message: \'Queue status retrieved\'
     })
   } catch (error) {
     res.status(500).json({
-      error: 'Internal Server Error',
+      error: \'Internal Server Error\',
       message: error.message
     })
   }
@@ -403,8 +399,8 @@ export const callNextPatient = async (req, res) => {
 
     if (!clinic) {
       return res.status(400).json({
-        error: 'Bad Request',
-        message: 'clinic is required'
+        error: \'Bad Request\',
+        message: \'clinic is required\'
       })
     }
 
@@ -413,7 +409,7 @@ export const callNextPatient = async (req, res) => {
         clinic: {
           name: clinic
         },
-        status: 'SERVING'
+        status: \'SERVING\'
       }
     });
 
@@ -423,7 +419,7 @@ export const callNextPatient = async (req, res) => {
           id: currentServingToken.id
         },
         data: {
-          status: 'COMPLETED'
+          status: \'COMPLETED\'
         }
       });
     }
@@ -434,20 +430,21 @@ export const callNextPatient = async (req, res) => {
         clinic: {
           name: clinic
         },
-        status: 'WAITING'
+        status: \'WAITING\'
       },
       orderBy: {
-        tokenNumber: 'asc'
+        tokenNumber: \'asc\'
       },
       include: {
-        patient: true
+        patient: true,
+        clinic: true
       }
     });
 
     if (!nextToken) {
       return res.status(404).json({
-        error: 'Not Found',
-        message: 'No waiting tokens in queue'
+        error: \'Not Found\',
+        message: \'No waiting tokens in queue\'
       })
     }
 
@@ -457,10 +454,11 @@ export const callNextPatient = async (req, res) => {
         id: nextToken.id
       },
       data: {
-        status: 'SERVING'
+        status: \'SERVING\'
       },
       include: {
-        patient: true
+        patient: true,
+        clinic: true
       }
     });
 
@@ -471,13 +469,13 @@ export const callNextPatient = async (req, res) => {
         patient: updatedToken.patient.name,
         phone: updatedToken.patient.phone,
         reason: updatedToken.reasonForVisit,
-        clinic
+        clinic: updatedToken.clinic.name
       },
-      message: 'Next patient called'
+      message: \'Next patient called\'
     })
   } catch (error) {
     res.status(500).json({
-      error: 'Internal Server Error',
+      error: \'Internal Server Error\',
       message: error.message
     })
   }
@@ -494,8 +492,8 @@ export const completeConsultation = async (req, res) => {
 
     if (!tokenNumber) {
       return res.status(400).json({
-        error: 'Bad Request',
-        message: 'tokenNumber is required'
+        error: \'Bad Request\',
+        message: \'tokenNumber is required\'
       })
     }
 
@@ -511,8 +509,8 @@ export const completeConsultation = async (req, res) => {
 
     if (!token) {
       return res.status(404).json({
-        error: 'Not Found',
-        message: 'Token not found'
+        error: \'Not Found\',
+        message: \'Token not found\'
       })
     }
 
@@ -522,7 +520,7 @@ export const completeConsultation = async (req, res) => {
         id: token.id
       },
       data: {
-        status: 'COMPLETED'
+        status: \'COMPLETED\'
       }
     });
 
@@ -531,13 +529,13 @@ export const completeConsultation = async (req, res) => {
       data: {
         tokenNumber,
         patient: token.patient.name,
-        status: 'COMPLETED'
+        status: \'COMPLETED\'
       },
-      message: 'Consultation marked as complete'
+      message: \'Consultation marked as complete\'
     })
   } catch (error) {
     res.status(500).json({
-      error: 'Internal Server Error',
+      error: \'Internal Server Error\',
       message: error.message
     })
   }
@@ -554,35 +552,32 @@ export const completeConsultationByTokenNumber = async (req, res) => {
     if (!tokenNumber || Number.isNaN(tokenNumber)) {
       return res.status(400).json({
         success: false,
-        error: 'Bad Request',
-        message: 'tokenNumber must be a number'
+        error: \'Bad Request\',
+        message: \'tokenNumber must be a number\'
       })
     }
 
-    const token = await prisma.token.update({
-      where: {
-        tokenNumber: tokenNumber
-      },
-      data: {
-        status: 'COMPLETED'
-      },
-      include: {
-        patient: true,
-        clinic: true
-      }
+    const token = await prisma.token.findFirst({ 
+        where: { tokenNumber },
+        include: { clinic: true }
     });
 
     if (!token) {
       return res.status(404).json({
         success: false,
-        error: 'Not Found',
-        message: 'Token not found'
+        error: \'Not Found\',
+        message: \'Token not found\'
       })
     }
 
-    const waitingCount = await prisma.token.count({ where: { status: 'WAITING' } })
+    await prisma.token.update({
+        where: { id: token.id },
+        data: { status: "COMPLETED" }
+    });
+
+    const waitingCount = await prisma.token.count({ where: { status: \'WAITING\' } })
     const estimatedTime = waitingCount * 5
-    const serving = await prisma.token.findFirst({ where: { status: 'SERVING' } });
+    const serving = await prisma.token.findFirst({ where: { status: \'SERVING\' } });
     const currentToken = serving ? serving.tokenNumber : 0
 
     const patients = await prisma.token.findMany({
@@ -609,12 +604,12 @@ export const completeConsultationByTokenNumber = async (req, res) => {
         estimatedTime: `${estimatedTime} mins`,
         patients: patientData
       },
-      message: 'Consultation marked as complete'
+      message: \'Consultation marked as complete\'
     })
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: 'Internal Server Error',
+      error: \'Internal Server Error\',
       message: error.message
     })
   }
@@ -637,10 +632,10 @@ export const getAllTokens = async (req, res) => {
 
     const stats = {
       total: await prisma.token.count(),
-      waiting: await prisma.token.count({ where: { status: 'WAITING' } }),
-      serving: await prisma.token.count({ where: { status: 'SERVING' } }),
-      done: await prisma.token.count({ where: { status: 'COMPLETED' } }),
-      nextTokenNumber: (await prisma.token.findFirst({ orderBy: { tokenNumber: 'desc' } }))?.tokenNumber + 1 || 1
+      waiting: await prisma.token.count({ where: { status: \'WAITING\' } }),
+      serving: await prisma.token.count({ where: { status: \'SERVING\' } }),
+      done: await prisma.token.count({ where: { status: \'COMPLETED\' } }),
+      nextTokenNumber: (await prisma.token.findFirst({ orderBy: { tokenNumber: \'desc\' } }))?.tokenNumber + 1 || 1
     }
 
     res.status(200).json({
@@ -653,11 +648,11 @@ export const getAllTokens = async (req, res) => {
           clinic: t.clinic.name
         }))
       },
-      message: 'All tokens retrieved'
+      message: \'All tokens retrieved\'
     })
   } catch (error) {
     res.status(500).json({
-      error: 'Internal Server Error',
+      error: \'Internal Server Error\',
       message: error.message
     })
   }
@@ -679,11 +674,11 @@ export const resetQueue = async (req, res) => {
         previousTokenCount: oldTokenCount,
         newTokenNumber: 1
       },
-      message: 'Queue reset successfully'
+      message: \'Queue reset successfully\'
     })
   } catch (error) {
     res.status(500).json({
-      error: 'Internal Server Error',
+      error: \'Internal Server Error\',
       message: error.message
     })
   }
@@ -699,46 +694,46 @@ export const resetQueue = async (req, res) => {
 export const moveQueueForward = async (req, res) => {
   try {
 
-    const currentServing = await prisma.token.findFirst({ where: { status: 'SERVING' } });
+    const currentServing = await prisma.token.findFirst({ where: { status: \'SERVING\' } });
     if(currentServing){
-      await prisma.token.update({ where: { id: currentServing.id }, data: { status: 'COMPLETED' } });
+      await prisma.token.update({ where: { id: currentServing.id }, data: { status: \'COMPLETED\' } });
     }
 
     // Find next waiting patient
     const nextWaitingToken = await prisma.token.findFirst({
-      where: { status: 'WAITING' },
-      orderBy: { tokenNumber: 'asc' },
+      where: { status: \'WAITING\' },
+      orderBy: { tokenNumber: \'asc\' },
       include: { patient: true, clinic: true }
     });
 
     if (!nextWaitingToken) {
       // Queue is empty or no more waiting patients
       
-      const waitingCount = await prisma.token.count({ where: { status: 'WAITING' } });
+      const waitingCount = await prisma.token.count({ where: { status: \'WAITING\' } });
       const estimatedTime = waitingCount * 5
 
       return res.status(200).json({
         success: true,
         data: {
-          message: 'Queue is now empty',
+          message: \'Queue is now empty\',
           currentToken: null,
           waiting: waitingCount,
           estimatedTime: `${estimatedTime} mins`,
           lastUpdated: new Date().toISOString()
         },
-        message: 'Queue moved forward - no more patients waiting'
+        message: \'Queue moved forward - no more patients waiting\'
       })
     }
 
     // Move next waiting patient to serving
     const updatedToken = await prisma.token.update({
       where: { id: nextWaitingToken.id },
-      data: { status: 'SERVING' },
+      data: { status: \'SERVING\' },
       include: { patient: true, clinic: true }
     });
 
     // Calculate queue metrics
-    const waitingCount = await prisma.token.count({ where: { status: 'WAITING' } });
+    const waitingCount = await prisma.token.count({ where: { status: \'WAITING\' } });
     const estimatedTime = waitingCount * 5
 
     res.status(200).json({
@@ -753,11 +748,11 @@ export const moveQueueForward = async (req, res) => {
         estimatedTime: `${estimatedTime} mins`,
         lastUpdated: new Date().toISOString()
       },
-      message: 'Queue moved forward successfully'
+      message: \'Queue moved forward successfully\'
     })
   } catch (error) {
     res.status(500).json({
-      error: 'Internal Server Error',
+      error: \'Internal Server Error\',
       message: error.message
     })
   }
