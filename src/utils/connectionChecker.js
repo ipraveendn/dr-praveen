@@ -85,9 +85,9 @@ export async function logConnectionDiagnostics() {
   if (!diagnostics.backendAvailable) {
     console.error(`❌ Backend unavailable at ${API_BASE_URL}`)
     console.error('Please ensure:')
-    console.error('1. Backend is running: npm run dev (in backend folder)')
-    console.error(`2. Backend is on port 5000 or configured in environment`)
-    console.error('3. No firewall is blocking the connection')
+    console.error('1. The backend URL is correct for your environment.')
+    console.error('2. Your local network or deployment can reach the Render backend.')
+    console.error('3. No firewall or browser extension is blocking the request.')
   } else {
     console.log(`✅ Backend available at ${API_BASE_URL}`)
   }

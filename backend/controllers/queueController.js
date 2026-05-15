@@ -140,15 +140,30 @@ export const getQueueData = async (req, res) => {
           lte: endOfDay
         }
       },
-      include: { patient: true, clinic: true },
       orderBy: { tokenNumber: 'asc' },
+      select: {
+        tokenNumber: true,
+        status: true,
+        reasonForVisit: true,
+        patient: {
+          select: {
+            name: true,
+            phone: true,
+          }
+        },
+        clinic: {
+          select: {
+            name: true,
+          }
+        }
+      }
     });
 
     const servingToken = tokens.find(t => t.status === 'SERVING');
     const waitingTokens = tokens.filter(t => t.status === 'WAITING');
     
     return res.status(200).json({
-      success: true, 
+      success: true,
       data: {
         currentToken: servingToken ? servingToken.tokenNumber : null,
         waiting: waitingTokens.length,
@@ -157,7 +172,7 @@ export const getQueueData = async (req, res) => {
             tokenNumber: t.tokenNumber,
             name: t.patient.name,
             status: t.status,
-            clinic: t.clinic.name, // Add clinic name to patient data
+            clinic: t.clinic.name,
             phone: t.patient.phone,
             reason: t.reasonForVisit
         })),

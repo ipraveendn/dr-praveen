@@ -62,6 +62,7 @@ model Token {
   patient          Patient     @relation(fields: [patientId], references: [id])
 
   @@unique([tokenNumber, appointmentDate])
+  @@index([clinicId, appointmentDate])
 }
 
 enum TokenStatus {
