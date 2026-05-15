@@ -258,6 +258,8 @@ export const callNextPatient = async (req, res) => {
 
 export const completeConsultationByTokenNumber = async (req, res) => {
     const tokenNumber = Number(req.params.tokenNumber);
+    const { clinic } = req.body;
+
     if (!tokenNumber || isNaN(tokenNumber)) {
         return res.status(400).json({ success: false, message: "A valid token number is required." });
     }
@@ -266,9 +268,20 @@ export const completeConsultationByTokenNumber = async (req, res) => {
         const todayStart = getStartOfDay();
         const todayEnd = getEndOfDay();
 
-        const token = await prisma.token.findFirst({
-            where: { tokenNumber, appointmentDate: { gte: todayStart, lte: todayEnd } }
-        });
+        let whereClause = {
+            tokenNumber,
+            appointmentDate: { gte: todayStart, lte: todayEnd }
+        };
+
+        if (clinic) {
+            const clinicRecord = await prisma.clinic.findUnique({ where: { name: clinic } });
+            if (!clinicRecord) {
+                return res.status(404).json({ success: false, message: `Clinic ${clinic} not found.` });
+            }
+            whereClause.clinicId = clinicRecord.id;
+        }
+
+        const token = await prisma.token.findFirst({ where: whereClause });
 
         if (!token) {
             return res.status(404).json({ success: false, message: "Token not found for the current day." });

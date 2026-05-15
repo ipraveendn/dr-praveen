@@ -17,6 +17,18 @@ export default function AdminDashboard() {
   const [queueData, setQueueData]             = useState(null)
   const [queueLoading, setQueueLoading]       = useState(true)
   const [completeLoading, setCompleteLoading] = useState(false)
+  const [actionLoading, setActionLoading]     = useState(false)
+
+  const refreshQueue = async () => {
+    try {
+      const json = await apiRequest(`/queue?clinic=${clinicId}`)
+      setQueueData(json?.data ?? null)
+    } catch {
+      setQueueData(null)
+    } finally {
+      setQueueLoading(false)
+    }
+  }
 
   // Poll queue every 4 seconds
   useEffect(() => {
@@ -43,9 +55,10 @@ export default function AdminDashboard() {
   }, [clinicId])
 
   const apiPatients = Array.isArray(queueData?.patients) ? queueData.patients : []
-  const waiting     = apiPatients.filter(p => p.status === 'waiting' || p.status === 'WAITING')
-  const serving     = apiPatients.find(p => p.status === 'serving' || p.status === 'SERVING')
-  const completed   = apiPatients.filter(p => p.status === 'done' || p.status === 'COMPLETED')
+  const normalizeStatus = (status) => String(status || '').toUpperCase()
+  const waiting     = apiPatients.filter(p => normalizeStatus(p.status) === 'WAITING')
+  const serving     = apiPatients.find(p => normalizeStatus(p.status) === 'SERVING')
+  const completed   = apiPatients.filter(p => normalizeStatus(p.status) === 'COMPLETED')
   const revenue     = completed.length * 500
 
   async function addPatient() {
@@ -56,6 +69,9 @@ export default function AdminDashboard() {
         method: 'POST',
         body: JSON.stringify({ name: form.name, phone: form.phone, reason: form.reason, clinic: clinicId })
       })
+      await refreshQueue()
+    } catch (error) {
+      console.error('[AdminDashboard] Add patient failed:', error)
     } finally {
       setForm({ name: '', phone: '', reason: '' })
       setShowAdd(false)
@@ -64,14 +80,27 @@ export default function AdminDashboard() {
   }
 
   async function callNext() {
-    await apiRequest('/queue/next', { method: 'POST', body: JSON.stringify({ clinic: clinicId }) })
+    if (waiting.length === 0 || actionLoading) return
+    setActionLoading(true)
+    try {
+      await apiRequest('/queue/next', { method: 'POST', body: JSON.stringify({ clinic: clinicId }) })
+      await refreshQueue()
+    } catch (error) {
+      console.error('[AdminDashboard] Call next failed:', error)
+    } finally {
+      setActionLoading(false)
+    }
   }
 
   async function markDone() {
     if (!serving?.tokenNumber || completeLoading) return
     setCompleteLoading(true)
     try {
-      await apiRequest(`/queue/complete/${serving.tokenNumber}`, { method: 'PATCH' })
+      await apiRequest(`/queue/complete/${serving.tokenNumber}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ clinic: clinicId })
+      })
+      await refreshQueue()
     } catch (e) {
       console.error(e)
     } finally {
@@ -143,7 +172,7 @@ export default function AdminDashboard() {
 
       <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
 
-        {/* ── STATS ── */}
+       
         <div className="admin-stats" style={{
           display: 'grid', gridTemplateColumns: 'repeat(4,1fr)',
           gap: '12px', marginBottom: '20px',
@@ -202,16 +231,17 @@ export default function AdminDashboard() {
             </div>
 
             {/* Call Next */}
-            <button onClick={callNext} disabled={waiting.length === 0} style={{
+            <button onClick={callNext} disabled={waiting.length === 0 || actionLoading} style={{
               background: waiting.length > 0 ? 'linear-gradient(135deg,#0B7B6F,#096358)' : '#E2EEEC',
               color: waiting.length > 0 ? '#fff' : '#94A3B8',
               border: 'none', borderRadius: '12px', padding: '16px',
               fontSize: '14px', fontWeight: '700',
-              cursor: waiting.length > 0 ? 'pointer' : 'not-allowed',
+              cursor: waiting.length > 0 && !actionLoading ? 'pointer' : 'not-allowed',
               boxShadow: waiting.length > 0 ? '0 4px 16px rgba(11,123,111,0.25)' : 'none',
               fontFamily: "'DM Sans',sans-serif", transition: '0.2s',
+              opacity: actionLoading ? 0.7 : 1,
             }}>
-              Call Next Patient
+              {actionLoading ? 'Calling next...' : 'Call Next Patient'}
             </button>
 
             {/* Add Patient Toggle */}
