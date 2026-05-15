@@ -6,9 +6,8 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// =================================================================================================
-// == HELPER FUNCTIONS
-// =================================================================================================
+
+//  HELPER FUNCTIONS
 
 const getStartOfDay = () => {
   const now = new Date();
@@ -23,9 +22,9 @@ const getEndOfDay = () => {
 };
 
 
-// =================================================================================================
+
 // == CORE QUEUE LOGIC
-// =================================================================================================
+
 
 export const addToken = async (req, res) => {
   console.log("[addToken] STEP 1: Request received for new token.");
