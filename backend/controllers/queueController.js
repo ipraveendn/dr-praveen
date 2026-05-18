@@ -450,6 +450,7 @@ export const completeConsultationByTokenNumber = async (req, res) => {
 
         // IMPORTANT: Only allow completing SERVING or WAITING tokens
         if (token.status !== 'SERVING' && token.status !== 'WAITING') {
+<<<<<<< HEAD
             console.warn(`[completeConsultationByTokenNumber] Token #${tokenNumber} is already ${token.status}`);
             return res.status(400).json({
                 success: false,
@@ -506,20 +507,118 @@ export const completeConsultationByTokenNumber = async (req, res) => {
 
         console.log(`[completeConsultationByTokenNumber] SUCCESS - Returning complete queue state`);
         
+=======
+          console.warn(`[completeConsultationByTokenNumber] Token #${tokenNumber} is already ${token.status}, cannot complete`);
+          return res.status(400).json({
+            success: false,
+            message: `Token #${tokenNumber} is already ${token.status.toLowerCase()}. Cannot complete.`
+          });
+        }
+
+        console.log(`[completeConsultationByTokenNumber] STEP 2: BEFORE UPDATE - Token #${tokenNumber} status: ${token.status}`);
+        console.log(`[completeConsultationByTokenNumber] BEFORE UPDATE - DB state:`, {
+            id: token.id,
+            tokenNumber: token.tokenNumber,
+            status: token.status,
+            updatedAt: token.updatedAt
+        });
+
+        const updated = await prisma.token.update({
+            where: { id: token.id },
+            data: { status: 'COMPLETED' },
+            include: { patient: true }
+        });
+
+        console.log(`[completeConsultationByTokenNumber] STEP 2: AFTER UPDATE - Token #${tokenNumber} status: ${updated.status}`);
+
+        const verification = await prisma.token.findUnique({
+            where: { id: token.id }
+        });
+        console.log(`[completeConsultationByTokenNumber] VERIFICATION - DB check after update:`, {
+            id: verification.id,
+            tokenNumber: verification.tokenNumber,
+            status: verification.status,
+            updatedAt: verification.updatedAt
+        });
+
+        if (verification.status !== 'COMPLETED') {
+            console.error(`[CRITICAL BUG] DATABASE UPDATE FAILED - Token still shows as ${verification.status} after Prisma update!`);
+            throw new Error(`Database write failed: expected COMPLETED, got ${verification.status}`);
+        }
+
+        console.log(`[completeConsultationByTokenNumber] STEP 3: Promoting next waiting token if available`);
+        const nextWaiting = await prisma.token.findFirst({
+            where: {
+                clinicId: token.clinicId,
+                status: 'WAITING',
+                appointmentDate: { gte: todayStart, lte: todayEnd }
+            },
+            orderBy: { tokenNumber: 'asc' }
+        });
+
+        if (nextWaiting) {
+            await prisma.token.update({
+                where: { id: nextWaiting.id },
+                data: { status: 'SERVING' }
+            });
+            console.log(`[completeConsultationByTokenNumber] STEP 3: Token #${nextWaiting.tokenNumber} promoted to SERVING`);
+        } else {
+            console.log('[completeConsultationByTokenNumber] STEP 3: No waiting patient to promote');
+        }
+
+        const freshTokens = await prisma.token.findMany({
+            where: {
+                clinicId: token.clinicId,
+                appointmentDate: { gte: todayStart, lte: todayEnd }
+            },
+            orderBy: { tokenNumber: 'asc' },
+            select: {
+                tokenNumber: true,
+                status: true,
+                reasonForVisit: true,
+                patient: {
+                    select: {
+                        name: true,
+                        phone: true,
+                    }
+                },
+                clinic: {
+                    select: {
+                        name: true,
+                    }
+                }
+            }
+        });
+
+        const servingToken = freshTokens.find(t => t.status === 'SERVING');
+        const waitingTokens = freshTokens.filter(t => t.status === 'WAITING');
+
+        console.log(`[completeConsultationByTokenNumber] SUCCESS - Token #${tokenNumber} marked COMPLETED, returning full queue state`);
+
+>>>>>>> aa0f33061c0e1068e00417ef8e79d33ae671ca49
         return res.status(200).json({
             success: true,
             message: `Token #${tokenNumber} marked as complete.`,
             data: {
+<<<<<<< HEAD
                 tokenUpdated: tokenNumber,
                 completedStatus: 'COMPLETED',
                 queueUpdated: true,
                 currentServing: result.servingToken?.tokenNumber || null,
                 waitingCount: result.waitingTokens.length,
                 patients: result.allTokens.map(t => ({
+=======
+                currentToken: servingToken ? servingToken.tokenNumber : null,
+                waiting: waitingTokens.length,
+                estimatedTime: `${waitingTokens.length * 5} mins`,
+                patients: freshTokens.map(t => ({
+>>>>>>> aa0f33061c0e1068e00417ef8e79d33ae671ca49
                     tokenNumber: t.tokenNumber,
                     name: t.patient.name,
                     status: t.status,
-                    phone: t.patient.phone
+                    clinic: t.clinic.name,
+                    phone: t.patient.phone,
+                    reason: t.reasonForVisit
                 }))
             }
         });
