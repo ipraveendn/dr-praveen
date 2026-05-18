@@ -33,6 +33,19 @@ function isCacheValid(cacheEntry) {
 }
 
 /**
+ * Invalidate cache for a specific endpoint
+ */
+function invalidateCache(url) {
+  // Invalidate exact match and variations
+  for (const [key] of requestCache) {
+    if (key.includes(url)) {
+      console.log(`[apiFetch] Invalidating cache for ${key}`)
+      requestCache.delete(key)
+    }
+  }
+}
+
+/**
  * Enhanced fetch function with automatic JWT authentication, timeout, deduplication, and caching.
  * @param {string} url - API endpoint (e.g., '/queue')
  * @param {Object} options - Fetch options (method, body, headers, etc.)
@@ -92,6 +105,12 @@ export async function apiFetch(url, options = {}) {
       const response = await fetch(fullUrl, { ...finalOptions, signal: controller.signal });
       clearTimeout(timeoutId);
       console.log(`[apiFetch] Response received. Status: ${response.status}`)
+      
+      // CRITICAL: Invalidate cache after successful mutations on queue endpoints
+      if (response.ok && (method === 'POST' || method === 'PATCH') && url.includes('/queue')) {
+        console.log(`[apiFetch] Mutation detected on ${url}, invalidating queue cache`)
+        invalidateCache('/queue')
+      }
       
       // Cache successful GET responses
       if (response.ok && method === 'GET' && CACHE_WHITELIST.some(ep => url.includes(ep))) {

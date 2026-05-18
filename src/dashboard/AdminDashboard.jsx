@@ -74,13 +74,25 @@ export default function AdminDashboard() {
     setAdding(true)
     try {
       console.log('[AdminDashboard] Adding patient:', form)
-      await apiRequest('/queue/add', {
+      const response = await apiRequest('/queue/add', {
         method: 'POST',
         body: JSON.stringify({ name: form.name, phone: form.phone, reason: form.reason, clinic: clinicId })
       })
-      // Refresh queue after adding
-      await refreshQueue(true)
-      console.log('[AdminDashboard] Patient added successfully')
+      console.log('[AdminDashboard] Patient added successfully, response:', response)
+      
+      // Update queue with response data if available
+      if (response?.data?.patients) {
+        console.log('[AdminDashboard] Updating queue from add response')
+        setQueueData({
+          currentToken: response.data.currentToken || queueData?.currentToken,
+          waiting: response.data.patients.filter(p => p.status === 'WAITING').length,
+          estimatedTime: response.data.estimatedTime || '0 mins',
+          patients: response.data.patients
+        })
+      } else {
+        // Fallback: refresh queue if response doesn't have patients
+        await refreshQueue(true)
+      }
     } catch (error) {
       console.error('[AdminDashboard] Add patient failed:', error)
     } finally {
@@ -123,14 +135,22 @@ export default function AdminDashboard() {
     
     try {
       console.log('[AdminDashboard] Sending callNext request to backend')
-      await apiRequest('/queue/next', { 
+      const response = await apiRequest('/queue/next', { 
         method: 'POST', 
         body: JSON.stringify({ clinic: clinicId }) 
       })
-      console.log('[AdminDashboard] CallNext succeeded')
-      // After backend confirms, fetch fresh data (but UI already updated)
-      await new Promise(resolve => setTimeout(resolve, 300)) // Small delay for user to see change
-      await refreshQueue(true)
+      console.log('[AdminDashboard] CallNext succeeded, response:', response)
+      
+      // CRITICAL FIX: Use backend response data directly (contains full updated queue)
+      if (response?.data?.patients) {
+        console.log('[AdminDashboard] Updating queue from backend response with', response.data.patients.length, 'patients')
+        setQueueData({
+          currentToken: response.data.nextServing || null,
+          waiting: response.data.patients.filter(p => p.status === 'WAITING').length,
+          estimatedTime: response.data.estimatedTime || '0 mins',
+          patients: response.data.patients
+        })
+      }
     } catch (error) {
       console.error('[AdminDashboard] Call next failed:', error)
       // REVERT optimistic update on error
@@ -167,14 +187,22 @@ export default function AdminDashboard() {
     
     try {
       console.log('[AdminDashboard] Sending complete request for token:', servingTokenNumber)
-      await apiRequest(`/queue/complete/${servingTokenNumber}`, {
+      const response = await apiRequest(`/queue/complete/${servingTokenNumber}`, {
         method: 'PATCH',
         body: JSON.stringify({ clinic: clinicId })
       })
-      console.log('[AdminDashboard] MarkDone succeeded')
-      // After backend confirms, fetch fresh data
-      await new Promise(resolve => setTimeout(resolve, 300))
-      await refreshQueue(true)
+      console.log('[AdminDashboard] MarkDone succeeded, response:', response)
+      
+      // CRITICAL FIX: Use backend response data directly (contains full updated queue)
+      if (response?.data?.patients) {
+        console.log('[AdminDashboard] Updating queue from backend response with', response.data.patients.length, 'patients')
+        setQueueData({
+          currentToken: response.data.currentServing || null,
+          waiting: response.data.waitingCount || 0,
+          estimatedTime: response.data.estimatedTime || '0 mins',
+          patients: response.data.patients
+        })
+      }
     } catch (error) {
       console.error('[AdminDashboard] Mark done failed:', error)
       // REVERT optimistic update on error
