@@ -16,6 +16,19 @@ export default function DoctorDashboard() {
   const [completeLoading, setCompleteLoading] = useState(false)
   const today = new Date().toDateString()
 
+  const normalizeQueuePayload = (payload) => {
+    if (!payload) return null
+    const nextPayload = { ...payload }
+    if (Array.isArray(nextPayload.patients)) {
+      nextPayload.patients = nextPayload.patients.map((p) => {
+        const s = String(p.status || '').toUpperCase()
+        const mapped = s === 'COMPLETED' ? 'done' : s.toLowerCase()
+        return { ...p, status: mapped }
+      })
+    }
+    return nextPayload
+  }
+
   useEffect(() => {
     let mounted = true
     let intervalId = null
@@ -24,15 +37,7 @@ export default function DoctorDashboard() {
       try {
         const json = await apiRequest(`/queue?clinic=${clinic}`)
         if (!mounted) return
-        const payload = json?.data ?? null
-        if (payload && Array.isArray(payload.patients)) {
-          payload.patients = payload.patients.map(p => {
-            const s = String(p.status || '').toUpperCase();
-            let mapped = s === 'COMPLETED' ? 'done' : s.toLowerCase();
-            return { ...p, status: mapped };
-          })
-        }
-        setQueueData(payload)
+        setQueueData(normalizeQueuePayload(json?.data ?? null))
       } catch {
         if (!mounted) return
         setQueueData(null)
@@ -58,16 +63,27 @@ export default function DoctorDashboard() {
     try {
       console.log('[DoctorDashboard] markDone -> sending PATCH complete for token', tokenNumber, 'clinic', clinic)
       const json = await apiRequest(`/queue/complete/${tokenNumber}`, { method: 'PATCH', body: JSON.stringify({ clinic }) })
+      console.log('[DoctorDashboard] markDone -> response', json)
+
       const payload = json?.data ?? null
       if (payload && Array.isArray(payload.patients)) {
-        payload.patients = payload.patients.map(p => {
-          const s = String(p.status || '').toUpperCase();
-          let mapped = s === 'COMPLETED' ? 'done' : s.toLowerCase();
-          return { ...p, status: mapped };
+        const normalized = payload.patients.map((p) => {
+          const s = String(p.status || '').toUpperCase()
+          const mapped = s === 'COMPLETED' ? 'done' : s.toLowerCase()
+          return { ...p, status: mapped }
         })
+
+        setQueueData({
+          currentToken: payload.currentToken ?? null,
+          waiting: payload.waiting ?? 0,
+          estimatedTime: payload.estimatedTime ?? '0 mins',
+          patients: normalized,
+        })
+      } else {
+        // Fallback: force a refresh if backend returned only a partial response
+        const refresh = await apiRequest(`/queue?clinic=${clinic}`)
+        setQueueData(normalizeQueuePayload(refresh?.data ?? null))
       }
-      console.log('[DoctorDashboard] markDone -> response', json)
-      setQueueData(payload)
     } catch (e) {
       console.error('[DoctorDashboard] markDone error:', e)
     } finally {
@@ -78,8 +94,8 @@ export default function DoctorDashboard() {
   // logout function provided by useAuth hook
 
   const apiPatients = Array.isArray(queueData?.patients) ? queueData.patients : []
-  const serving   = apiPatients.find(p => p.status === 'serving')
-  const waiting   = apiPatients.filter(p => p.status === 'waiting')
+  const serving = apiPatients.find(p => p.status === 'serving') ?? null
+  const waiting = apiPatients.filter(p => p.status === 'waiting')
   const completed = apiPatients.filter(p => p.status === 'done')
   const revenue   = completed.length * 500
 
@@ -120,7 +136,7 @@ export default function DoctorDashboard() {
         {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: '14px', marginBottom: '24px' }}>
           {[
-            ['CURRENTLY SERVING', queueLoading ? '...' : (queueData?.currentToken ?? 0), '#0B7B6F'],
+            ['CURRENTLY SERVING', queueLoading ? '...' : (queueData?.currentToken ?? (serving?.tokenNumber ?? 0)), '#0B7B6F'],
             ['COMPLETED',         completed.length,                                 '#10B981'],
             ['PATIENTS WAITING',  queueLoading ? '...' : (queueData?.waiting ?? 0), '#F59E0B'],
             ['REVENUE TODAY',   `₹${revenue.toLocaleString()}`, '#C9A84C'],
@@ -144,7 +160,7 @@ export default function DoctorDashboard() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '20px', fontWeight: '700', color: '#0A1628', fontFamily: "'Cormorant Garamond',serif" }}>{serving.name}</div>
-                  <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}> {serving.phone}</div>
+                    <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}> {serving.phone}</div>
                 </div>
                 <span style={{ background: '#FEF3C7', color: '#92400E', padding: '6px 16px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>🔔 Now Consulting</span>
               </div>
@@ -154,7 +170,7 @@ export default function DoctorDashboard() {
               </div>
               <button
                 onClick={() => markDone(serving.tokenNumber)}
-                disabled={completeLoading}
+                disabled={completeLoading || !serving}
                 style={{ background: 'linear-gradient(135deg,#10B981,#059669)', color: '#fff', border: 'none', padding: '14px 28px', borderRadius: '10px', cursor: completeLoading ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans',sans-serif", fontSize: '14px', fontWeight: '700', width: '100%', opacity: completeLoading ? 0.7 : 1 }}
               >
                 {completeLoading ? 'Completing...' : '✓ Mark Consultation Done'}
