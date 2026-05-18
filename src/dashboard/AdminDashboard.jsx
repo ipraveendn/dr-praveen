@@ -239,9 +239,12 @@ export default function AdminDashboard() {
           console.error('[CRITICAL] Backend response shows token is NOT COMPLETED:', tokenInResponse?.status);
         }
         
+        // Count waiting patients from the response
+        const waitingPatients = response.data.patients.filter(p => p.status === 'WAITING');
+        
         const newQueueData = {
-          currentToken: response.data.currentServing || null,
-          waiting: response.data.waitingCount || 0,
+          currentToken: response.data.currentToken || null,
+          waiting: waitingPatients.length,
           estimatedTime: response.data.estimatedTime || '0 mins',
           patients: response.data.patients
         };
