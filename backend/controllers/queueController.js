@@ -372,6 +372,22 @@ export const callNextPatient = async (req, res) => {
       });
 
       console.log(`[callNextPatient] TX: Queue snapshot:`, allTokens.map(t => ({ tokenNumber: t.tokenNumber, status: t.status })));
+      
+      // ⚠️ CRITICAL: Verify both updates happened correctly
+      const verifyCompleted = allTokens.find(t => t.tokenNumber === previousTokenNumber);
+      const verifyServing = allTokens.find(t => t.tokenNumber === updated.tokenNumber);
+      
+      console.log(`[callNextPatient] VERIFICATION:`, {
+        previousToken: verifyCompleted ? `#${verifyCompleted.tokenNumber} status=${verifyCompleted.status}` : 'NOT FOUND',
+        newServingToken: verifyServing ? `#${verifyServing.tokenNumber} status=${verifyServing.status}` : 'NOT FOUND'
+      });
+      
+      if (verifyCompleted && verifyCompleted.status !== 'COMPLETED') {
+        console.error(`[CRITICAL] Previous token #${previousTokenNumber} not COMPLETED, shows: ${verifyCompleted.status}`);
+      }
+      if (verifyServing && verifyServing.status !== 'SERVING') {
+        console.error(`[CRITICAL] New token #${updated.tokenNumber} not SERVING, shows: ${verifyServing.status}`);
+      }
 
       return {
         success: true,
@@ -444,6 +460,12 @@ export const completeConsultationByTokenNumber = async (req, res) => {
         }
 
         console.log(`[completeConsultationByTokenNumber] STEP 2: BEFORE UPDATE - Token #${tokenNumber} status: ${token.status}`);
+        console.log(`[completeConsultationByTokenNumber] BEFORE UPDATE - DB state:`, {
+            id: token.id,
+            tokenNumber: token.tokenNumber,
+            status: token.status,
+            updatedAt: token.updatedAt
+        });
         
         const updated = await prisma.token.update({
             where: { id: token.id },
@@ -452,6 +474,22 @@ export const completeConsultationByTokenNumber = async (req, res) => {
         });
 
         console.log(`[completeConsultationByTokenNumber] STEP 2: AFTER UPDATE - Token #${tokenNumber} status: ${updated.status}`);
+        
+        // ⚠️ CRITICAL: Verify update persisted to database
+        const verification = await prisma.token.findUnique({
+            where: { id: token.id }
+        });
+        console.log(`[completeConsultationByTokenNumber] VERIFICATION - DB check after update:`, {
+            id: verification.id,
+            tokenNumber: verification.tokenNumber,
+            status: verification.status,
+            updatedAt: verification.updatedAt
+        });
+        
+        if (verification.status !== 'COMPLETED') {
+            console.error(`[CRITICAL BUG] DATABASE UPDATE FAILED - Token still shows as ${verification.status} after Prisma update!`);
+            throw new Error(`Database write failed: expected COMPLETED, got ${verification.status}`);
+        }
 
         // CRITICAL FIX: Fetch COMPLETE queue state to return to frontend
         console.log(`[completeConsultationByTokenNumber] STEP 3: Fetching complete queue state for clinic ${token.clinicId}`);
