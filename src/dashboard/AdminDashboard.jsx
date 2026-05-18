@@ -172,29 +172,9 @@ export default function AdminDashboard() {
       
       // Update state with server response (confirms database persistence)
       if (response?.data?.patients && Array.isArray(response.data.patients)) {
-<<<<<<< HEAD
         setQueueData({
           currentToken: response.data.currentServing || null,
           waiting: response.data.waitingCount || 0,
-=======
-        console.log('[DEBUG] CONDITION PASSED - response has valid patients array');
-        console.log('[AdminDashboard] Updating queue from backend response with', response.data.patients.length, 'patients')
-        
-        // Verify token is COMPLETED in response
-        const tokenInResponse = response.data.patients.find(p => p.tokenNumber === servingTokenNumber);
-        console.log('[DEBUG] Token #' + servingTokenNumber + ' in response:', tokenInResponse);
-        
-        if (tokenInResponse?.status !== 'COMPLETED') {
-          console.error('[CRITICAL] Backend response shows token is NOT COMPLETED:', tokenInResponse?.status);
-        }
-        
-        // Count waiting patients from the response
-        const waitingPatients = response.data.patients.filter(p => p.status === 'WAITING');
-        
-        const newQueueData = {
-          currentToken: response.data.currentToken || null,
-          waiting: waitingPatients.length,
->>>>>>> aa0f33061c0e1068e00417ef8e79d33ae671ca49
           estimatedTime: response.data.estimatedTime || '0 mins',
           patients: response.data.patients
         })
