@@ -452,7 +452,7 @@ export const completeConsultationByTokenNumber = async (req, res) => {
         if (token.status !== 'SERVING' && token.status !== 'WAITING') {
             console.warn(`[completeConsultationByTokenNumber] Token #${tokenNumber} is already ${token.status}`);
             return res.status(400).json({
-                success: false,
+                success: false, 
                 message: `Token #${tokenNumber} is already ${token.status.toLowerCase()}.`
             });
         }
