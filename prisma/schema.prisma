@@ -63,6 +63,10 @@ model Token {
 
   @@unique([tokenNumber, appointmentDate])
   @@index([clinicId, appointmentDate])
+  @@index([clinicId, status])
+  @@index([status])
+  @@index([appointmentDate])
+  @@index([clinicId, status, appointmentDate])
 }
 
 enum TokenStatus {

@@ -1,6 +1,7 @@
 /**
  * API Utility for Authenticated Requests
  * Centralizes API endpoint and automatically attaches JWT Bearer token.
+ * Includes request deduplication and caching.
  */
 
 // Import environment configuration
@@ -10,15 +11,62 @@ const config = getConfig()
 const API_BASE_URL = `${config.API_BASE_URL}/api`;
 const API_TIMEOUT = config.API_TIMEOUT;
 
+// Cache for GET requests (simple in-memory cache)
+const requestCache = new Map()
+const pendingRequests = new Map()
+
+const CACHE_DURATION = 1000 // 1 second - short cache to avoid stale data
+const CACHE_WHITELIST = ['/queue'] // Only cache these endpoints
+
 /**
- * Enhanced fetch function with automatic JWT authentication and timeout.
+ * Generate cache key from URL and options
+ */
+function getCacheKey(url, options) {
+  return `${options?.method || 'GET'}:${url}`
+}
+
+/**
+ * Check if cache entry is still valid
+ */
+function isCacheValid(cacheEntry) {
+  return Date.now() - cacheEntry.timestamp < CACHE_DURATION
+}
+
+/**
+ * Enhanced fetch function with automatic JWT authentication, timeout, deduplication, and caching.
  * @param {string} url - API endpoint (e.g., '/queue')
  * @param {Object} options - Fetch options (method, body, headers, etc.)
  * @returns {Promise<Response>} - The raw Fetch response object.
  */
 export async function apiFetch(url, options = {}) {
   const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
-  console.log(`[apiFetch] Starting request to ${fullUrl}`, { method: options.method || 'GET', bodySize: options.body ? options.body.length : 0 })
+  const method = options.method || 'GET'
+  const cacheKey = getCacheKey(url, options)
+  
+  console.log(`[apiFetch] ${method} ${fullUrl}`, { bodySize: options.body ? options.body.length : 0 })
+
+  // REQUEST DEDUPLICATION: If same request is already pending, return that promise
+  if (pendingRequests.has(cacheKey) && method === 'GET') {
+    console.log(`[apiFetch] Duplicate request detected, returning pending promise for ${cacheKey}`)
+    return pendingRequests.get(cacheKey)
+  }
+
+  // CACHE CHECK: For GET requests, check cache first
+  if (method === 'GET' && CACHE_WHITELIST.some(ep => url.includes(ep))) {
+    const cached = requestCache.get(cacheKey)
+    if (cached && isCacheValid(cached)) {
+      console.log(`[apiFetch] Cache HIT for ${cacheKey}`)
+      // Create a fake response from cache
+      const response = new Response(JSON.stringify(cached.data), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+      return response
+    } else if (cached) {
+      console.log(`[apiFetch] Cache EXPIRED for ${cacheKey}`)
+      requestCache.delete(cacheKey)
+    }
+  }
 
   const headers = { ...options.headers };
 
@@ -37,20 +85,51 @@ export async function apiFetch(url, options = {}) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
-  try {
-    console.log(`[apiFetch] Sending fetch request to ${fullUrl}`)
-    const response = await fetch(fullUrl, { ...finalOptions, signal: controller.signal });
-    clearTimeout(timeoutId);
-    console.log(`[apiFetch] Response received. Status: ${response.status}, Headers:`, Object.fromEntries(response.headers))
-    return response;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    console.error(`[API FETCH ERROR] ${fullUrl}:`, error);
-    if (error.name === 'AbortError') {
-      throw new Error('Request timed out. Please check your connection and try again.');
+  // Create the fetch promise
+  const fetchPromise = (async () => {
+    try {
+      console.log(`[apiFetch] Sending ${method} request to ${fullUrl}`)
+      const response = await fetch(fullUrl, { ...finalOptions, signal: controller.signal });
+      clearTimeout(timeoutId);
+      console.log(`[apiFetch] Response received. Status: ${response.status}`)
+      
+      // Cache successful GET responses
+      if (response.ok && method === 'GET' && CACHE_WHITELIST.some(ep => url.includes(ep))) {
+        try {
+          const clonedResponse = response.clone()
+          const data = await clonedResponse.json()
+          requestCache.set(cacheKey, {
+            data,
+            timestamp: Date.now()
+          })
+          console.log(`[apiFetch] Cached GET response for ${cacheKey}`)
+        } catch (e) {
+          console.log(`[apiFetch] Could not cache response for ${cacheKey}:`, e)
+        }
+      }
+      
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      console.error(`[API FETCH ERROR] ${fullUrl}:`, error);
+      if (error.name === 'AbortError') {
+        throw new Error('Request timed out. Please check your connection and try again.');
+      }
+      throw new Error("Server temporarily unavailable. Please try again.");
+    } finally {
+      // Remove from pending requests
+      if (method === 'GET') {
+        pendingRequests.delete(cacheKey)
+      }
     }
-    throw new Error("Server temporarily unavailable. Please try again.");
+  })();
+
+  // Track pending request for deduplication
+  if (method === 'GET') {
+    pendingRequests.set(cacheKey, fetchPromise)
   }
+
+  return fetchPromise;
 }
 
 /**

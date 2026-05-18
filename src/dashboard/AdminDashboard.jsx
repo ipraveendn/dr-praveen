@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CLINICS } from '../data/content'
 import { useAuth } from '../hooks/useAuth'
@@ -18,58 +18,69 @@ export default function AdminDashboard() {
   const [queueLoading, setQueueLoading]       = useState(true)
   const [completeLoading, setCompleteLoading] = useState(false)
   const [actionLoading, setActionLoading]     = useState(false)
+  
+  // Track pending requests to avoid duplicates
+  const pendingRequests = useRef({})
+  const lastRefreshTime = useRef({})
 
-  const refreshQueue = async () => {
+  const refreshQueue = useCallback(async (forceRefresh = false) => {
+    const cacheKey = `queue_${clinicId}`
+    const now = Date.now()
+    
+    // Debounce: don't refresh if we just refreshed (within 500ms)
+    if (!forceRefresh && lastRefreshTime.current[cacheKey] && now - lastRefreshTime.current[cacheKey] < 500) {
+      console.log('[AdminDashboard] Skipping refresh - cache fresh')
+      return
+    }
+    
+    // Prevent duplicate requests
+    if (pendingRequests.current[cacheKey]) {
+      console.log('[AdminDashboard] Duplicate request prevented for', cacheKey)
+      return
+    }
+
+    pendingRequests.current[cacheKey] = true
+    lastRefreshTime.current[cacheKey] = now
+
     try {
+      console.log('[AdminDashboard] Fetching queue for clinic:', clinicId)
       const json = await apiRequest(`/queue?clinic=${clinicId}`)
       setQueueData(json?.data ?? null)
-    } catch {
+      console.log('[AdminDashboard] Queue data updated:', json?.data)
+    } catch (error) {
+      console.error('[AdminDashboard] Queue fetch failed:', error)
       setQueueData(null)
     } finally {
       setQueueLoading(false)
+      delete pendingRequests.current[cacheKey]
     }
-  }
-
-  // Poll queue every 4 seconds
-  useEffect(() => {
-    let mounted = true
-    let intervalId = null
-
-    const fetchQueue = async () => {
-      try {
-        const json = await apiRequest(`/queue?clinic=${clinicId}`)
-        if (!mounted) return
-        setQueueData(json?.data ?? null)
-      } catch {
-        if (!mounted) return
-        setQueueData(null)
-      } finally {
-        if (!mounted) return
-        setQueueLoading(false)
-      }
-    }
-
-    fetchQueue()
-    intervalId = setInterval(fetchQueue, 4000)
-    return () => { mounted = false; if (intervalId) clearInterval(intervalId) }
   }, [clinicId])
 
+  // Load initial queue data on clinic change
+  useEffect(() => {
+    console.log('[AdminDashboard] Clinic changed to:', clinicId)
+    setQueueLoading(true)
+    refreshQueue(true)
+  }, [clinicId, refreshQueue])
+
   const apiPatients = Array.isArray(queueData?.patients) ? queueData.patients : []
-  const normalizeStatus = (status) => String(status || '').toUpperCase()
-  const waiting     = apiPatients.filter(p => normalizeStatus(p.status) === 'WAITING')
-  const serving     = apiPatients.find(p => normalizeStatus(p.status) === 'SERVING')
-  const completed   = apiPatients.filter(p => normalizeStatus(p.status) === 'COMPLETED')
+  const waiting     = apiPatients.filter(p => p.status === 'WAITING')
+  const serving     = apiPatients.find(p => p.status === 'SERVING')
+  const completed   = apiPatients.filter(p => p.status === 'COMPLETED')
   const revenue     = completed.length * 500
 
   async function addPatient() {
     if (!form.name || !form.phone || !form.reason) return
     setAdding(true)
     try {
+      console.log('[AdminDashboard] Adding patient:', form)
       await apiRequest('/queue/add', {
         method: 'POST',
         body: JSON.stringify({ name: form.name, phone: form.phone, reason: form.reason, clinic: clinicId })
       })
-      await refreshQueue()
+      // Refresh queue after adding
+      await refreshQueue(true)
+      console.log('[AdminDashboard] Patient added successfully')
     } catch (error) {
       console.error('[AdminDashboard] Add patient failed:', error)
     } finally {
@@ -80,29 +91,94 @@ export default function AdminDashboard() {
   }
 
   async function callNext() {
-    if (waiting.length === 0 || actionLoading) return
+    if (waiting.length === 0 || actionLoading) {
+      console.log('[AdminDashboard] Cannot call next - no waiting patients or action in progress')
+      return
+    }
+    
     setActionLoading(true)
+    
+    // OPTIMISTIC UPDATE: Immediately update UI
+    const nextPatient = waiting[0]
+    const currentServing = serving
+    console.log('[AdminDashboard] Optimistic update: calling next patient', nextPatient)
+    
+    // Update UI optimistically: mark current as COMPLETED, move next to SERVING
+    setQueueData(prev => {
+      if (!prev) return prev
+      const updated = { ...prev }
+      updated.patients = updated.patients.map(p => {
+        if (p.tokenNumber === currentServing?.tokenNumber) {
+          return { ...p, status: 'COMPLETED' }
+        }
+        if (p.tokenNumber === nextPatient.tokenNumber) {
+          return { ...p, status: 'SERVING' }
+        }
+        return p
+      })
+      updated.currentToken = nextPatient.tokenNumber
+      updated.waiting = waiting.length - 1
+      return updated
+    })
+    
     try {
-      await apiRequest('/queue/next', { method: 'POST', body: JSON.stringify({ clinic: clinicId }) })
-      await refreshQueue()
+      console.log('[AdminDashboard] Sending callNext request to backend')
+      await apiRequest('/queue/next', { 
+        method: 'POST', 
+        body: JSON.stringify({ clinic: clinicId }) 
+      })
+      console.log('[AdminDashboard] CallNext succeeded')
+      // After backend confirms, fetch fresh data (but UI already updated)
+      await new Promise(resolve => setTimeout(resolve, 300)) // Small delay for user to see change
+      await refreshQueue(true)
     } catch (error) {
       console.error('[AdminDashboard] Call next failed:', error)
+      // REVERT optimistic update on error
+      await refreshQueue(true)
     } finally {
       setActionLoading(false)
     }
   }
 
   async function markDone() {
-    if (!serving?.tokenNumber || completeLoading) return
+    if (!serving?.tokenNumber || completeLoading) {
+      console.log('[AdminDashboard] Cannot mark done - no serving patient or already in progress')
+      return
+    }
+    
     setCompleteLoading(true)
+    const servingTokenNumber = serving.tokenNumber
+    
+    // OPTIMISTIC UPDATE: Immediately mark as completed
+    console.log('[AdminDashboard] Optimistic update: marking token', servingTokenNumber, 'as completed')
+    
+    setQueueData(prev => {
+      if (!prev) return prev
+      const updated = { ...prev }
+      updated.patients = updated.patients.map(p => {
+        if (p.tokenNumber === servingTokenNumber) {
+          return { ...p, status: 'COMPLETED' }
+        }
+        return p
+      })
+      updated.currentToken = null // No longer serving anyone
+      return updated
+    })
+    
     try {
-      await apiRequest(`/queue/complete/${serving.tokenNumber}`, {
+      console.log('[AdminDashboard] Sending complete request for token:', servingTokenNumber)
+      await apiRequest(`/queue/complete/${servingTokenNumber}`, {
         method: 'PATCH',
         body: JSON.stringify({ clinic: clinicId })
       })
-      await refreshQueue()
-    } catch (e) {
-      console.error(e)
+      console.log('[AdminDashboard] MarkDone succeeded')
+      // After backend confirms, fetch fresh data
+      await new Promise(resolve => setTimeout(resolve, 300))
+      await refreshQueue(true)
+    } catch (error) {
+      console.error('[AdminDashboard] Mark done failed:', error)
+      // REVERT optimistic update on error
+      await refreshQueue(true)
     } finally {
       setCompleteLoading(false)
     }
@@ -301,20 +377,30 @@ export default function AdminDashboard() {
 
             <div style={{ maxHeight: '460px', overflowY: 'auto' }}>
               {queueLoading ? (
-                <div style={{ padding: '48px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>Loading...</div>
+                <div style={{ padding: '48px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>
+                  <div>📍 Loading queue data...</div>
+                </div>
               ) : apiPatients.length === 0 ? (
                 <div style={{ padding: '48px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>No patients yet today</div>
-              ) : apiPatients.map(p => (
+              ) : apiPatients.map(p => {
+                const pStatus = String(p.status || '').toUpperCase()
+                const isServing = pStatus === 'SERVING'
+                const isCompleted = pStatus === 'COMPLETED'
+                const isWaiting = pStatus === 'WAITING'
+                
+                return (
                 <div key={p.tokenNumber} style={{
                   padding: '14px 20px', borderBottom: '1px solid #F0F4F4',
                   display: 'flex', alignItems: 'center', gap: '14px',
-                  background: (p.status === 'serving' || p.status === 'SERVING') ? '#E6F4F2' : '#fff',
+                  background: isServing ? '#E6F4F2' : '#fff',
+                  transition: 'background-color 0.3s ease',
                 }}>
                   <div style={{
                     width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
-                    background: (p.status === 'serving' || p.status === 'SERVING') ? 'linear-gradient(135deg,#0B7B6F,#096358)' : (p.status === 'done' || p.status === 'COMPLETED') ? '#E2EEEC' : '#E6F4F2',
+                    background: isServing ? 'linear-gradient(135deg,#0B7B6F,#096358)' : isCompleted ? '#E2EEEC' : '#E6F4F2',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontWeight: '800', color: (p.status === 'serving' || p.status === 'SERVING') ? '#fff' : '#0B7B6F', fontSize: '13px',
+                    fontWeight: '800', color: isServing ? '#fff' : '#0B7B6F', fontSize: '13px',
+                    transition: 'background-color 0.3s ease',
                   }}>
                     {String(p.tokenNumber).padStart(2, '0')}
                   </div>
@@ -326,20 +412,21 @@ export default function AdminDashboard() {
                   </div>
                   <span style={{
                     padding: '3px 10px', borderRadius: '20px', fontSize: '10px', fontWeight: '700', flexShrink: 0,
-                    background: (p.status === 'serving' || p.status === 'SERVING') ? '#0B7B6F' : (p.status === 'done' || p.status === 'COMPLETED') ? '#E2EEEC' : '#FEF3C7',
-                    color: (p.status === 'serving' || p.status === 'SERVING') ? '#fff' : (p.status === 'done' || p.status === 'COMPLETED') ? '#64748B' : '#92400E',
+                    background: isServing ? '#0B7B6F' : isCompleted ? '#E2EEEC' : '#FEF3C7',
+                    color: isServing ? '#fff' : isCompleted ? '#64748B' : '#92400E',
+                    transition: 'all 0.3s ease',
                   }}>
-                    {(p.status === 'serving' || p.status === 'SERVING') ? 'Serving' : (p.status === 'done' || p.status === 'COMPLETED') ? 'Done' : 'Waiting'}
+                    {isServing ? '🟢 Serving' : isCompleted ? '✓ Done' : '⏳ Waiting'}
                   </span>
-                  {(p.status === 'waiting' || p.status === 'WAITING') && (
-                    <button onClick={() => removePatient(p.tokenNumber)} style={{
+                  {isWaiting && (
+                    <button onClick={() => console.log('Remove not yet implemented')} style={{
                       background: 'none', border: '1px solid #E2EEEC', borderRadius: '6px',
                       color: '#94A3B8', cursor: 'pointer', fontSize: '11px',
                       padding: '3px 8px', fontFamily: "'DM Sans',sans-serif", flexShrink: 0,
                     }}>Remove</button>
                   )}
                 </div>
-              ))}
+              )})}
             </div>
 
             {/* Summary */}
