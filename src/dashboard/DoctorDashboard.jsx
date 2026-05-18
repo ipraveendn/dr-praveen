@@ -24,7 +24,15 @@ export default function DoctorDashboard() {
       try {
         const json = await apiRequest(`/queue?clinic=${clinic}`)
         if (!mounted) return
-        setQueueData(json?.data ?? null)
+        const payload = json?.data ?? null
+        if (payload && Array.isArray(payload.patients)) {
+          payload.patients = payload.patients.map(p => {
+            const s = String(p.status || '').toUpperCase();
+            let mapped = s === 'COMPLETED' ? 'done' : s.toLowerCase();
+            return { ...p, status: mapped };
+          })
+        }
+        setQueueData(payload)
       } catch {
         if (!mounted) return
         setQueueData(null)
@@ -48,10 +56,20 @@ export default function DoctorDashboard() {
     if (completeLoading) return
     setCompleteLoading(true)
     try {
-      const json = await apiRequest(`/queue/complete/${tokenNumber}`, { method: 'PATCH' })
-      setQueueData(json?.data ?? null)
+      console.log('[DoctorDashboard] markDone -> sending PATCH complete for token', tokenNumber, 'clinic', clinic)
+      const json = await apiRequest(`/queue/complete/${tokenNumber}`, { method: 'PATCH', body: JSON.stringify({ clinic }) })
+      const payload = json?.data ?? null
+      if (payload && Array.isArray(payload.patients)) {
+        payload.patients = payload.patients.map(p => {
+          const s = String(p.status || '').toUpperCase();
+          let mapped = s === 'COMPLETED' ? 'done' : s.toLowerCase();
+          return { ...p, status: mapped };
+        })
+      }
+      console.log('[DoctorDashboard] markDone -> response', json)
+      setQueueData(payload)
     } catch (e) {
-      console.error(e)
+      console.error('[DoctorDashboard] markDone error:', e)
     } finally {
       setCompleteLoading(false)
     }
