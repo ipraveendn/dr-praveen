@@ -104,164 +104,87 @@ export default function AdminDashboard() {
 
   async function callNext() {
     if (waiting.length === 0 || actionLoading) {
-      console.log('[AdminDashboard] Cannot call next - no waiting patients or action in progress')
       return
     }
     
-    console.log('[DEBUG] === CALL NEXT START ===');
     setActionLoading(true)
     
-    // OPTIMISTIC UPDATE: Immediately update UI
+    // OPTIMISTIC UPDATE
     const nextPatient = waiting[0]
     const currentServing = serving
-    console.log('[AdminDashboard] Optimistic update: calling next patient', nextPatient)
-    
-    // Update UI optimistically: mark current as COMPLETED, move next to SERVING
-    setQueueData(prev => {
-      if (!prev) return prev
-      const updated = { ...prev }
-      updated.patients = updated.patients.map(p => {
-        if (p.tokenNumber === currentServing?.tokenNumber) {
-          console.log('[DEBUG] Optimistic: marking', p.tokenNumber, 'as COMPLETED');
-          return { ...p, status: 'COMPLETED' }
-        }
-        if (p.tokenNumber === nextPatient.tokenNumber) {
-          console.log('[DEBUG] Optimistic: marking', p.tokenNumber, 'as SERVING');
-          return { ...p, status: 'SERVING' }
-        }
+    const optimisticData = {
+      ...queueData,
+      patients: queueData.patients.map(p => {
+        if (p.tokenNumber === currentServing?.tokenNumber) return { ...p, status: 'COMPLETED' }
+        if (p.tokenNumber === nextPatient.tokenNumber) return { ...p, status: 'SERVING' }
         return p
-      })
-      updated.currentToken = nextPatient.tokenNumber
-      updated.waiting = waiting.length - 1
-      return updated
-    })
+      }),
+      currentToken: nextPatient.tokenNumber
+    }
+    setQueueData(optimisticData)
     
     try {
-      console.log('[AdminDashboard] Sending callNext request to backend')
       const response = await apiRequest('/queue/next', { 
         method: 'POST', 
         body: JSON.stringify({ clinic: clinicId }) 
       })
-      console.log('[AdminDashboard] CallNext succeeded, response:', response)
-      console.log('[DEBUG] response.data.patients exists:', !!response?.data?.patients);
-      console.log('[DEBUG] response.data.patients length:', response?.data?.patients?.length);
       
-      // CRITICAL FIX: Use backend response data directly (contains full updated queue)
+      // Update state with server response
       if (response?.data?.patients && Array.isArray(response.data.patients)) {
-        console.log('[AdminDashboard] Updating queue from backend response with', response.data.patients.length, 'patients')
-        const newQueueData = {
+        setQueueData({
           currentToken: response.data.nextServing || null,
           waiting: response.data.patients.filter(p => p.status === 'WAITING').length,
           estimatedTime: response.data.estimatedTime || '0 mins',
           patients: response.data.patients
-        };
-        console.log('[DEBUG] New queue data:', newQueueData);
-        setQueueData(newQueueData);
-      } else {
-        console.error('[ERROR] Response missing or invalid patients array:', response?.data?.patients);
+        })
       }
     } catch (error) {
       console.error('[AdminDashboard] Call next failed:', error)
-      // REVERT optimistic update on error
       await refreshQueue(true)
     } finally {
       setActionLoading(false)
-      console.log('[DEBUG] === CALL NEXT END ===');
     }
   }
 
   async function markDone() {
-    console.log('[DEBUG] === MARK DONE START ===');
-    console.log('[DEBUG] Current serving patient:', serving);
-    console.log('[DEBUG] Current queue state:', queueData);
-    
     if (!serving?.tokenNumber || completeLoading) {
-      console.log('[AdminDashboard] Cannot mark done - no serving patient or already in progress')
       return
     }
     
     setCompleteLoading(true)
     const servingTokenNumber = serving.tokenNumber
-    console.log('[DEBUG] About to mark token', servingTokenNumber, 'as COMPLETED');
     
-    // Store original state for comparison
-    const originalQueueData = queueData;
-    console.log('[DEBUG] Original queue before optimistic update:', JSON.stringify(originalQueueData, null, 2));
-    
-    // OPTIMISTIC UPDATE: Immediately mark as completed
-    console.log('[AdminDashboard] Optimistic update: marking token', servingTokenNumber, 'as completed')
-    
-    setQueueData(prev => {
-      if (!prev) {
-        console.log('[DEBUG] Previous state is null, cannot update');
-        return prev;
-      }
-      const updated = { ...prev }
-      updated.patients = updated.patients.map(p => {
-        if (p.tokenNumber === servingTokenNumber) {
-          console.log('[DEBUG] Optimistic: marking token', p.tokenNumber, 'from', p.status, 'to COMPLETED');
-          return { ...p, status: 'COMPLETED' }
-        }
-        return p
-      })
-      updated.currentToken = null // No longer serving anyone
-      console.log('[DEBUG] After optimistic update, currentToken:', updated.currentToken);
-      console.log('[DEBUG] Token in new state:', updated.patients.find(p => p.tokenNumber === servingTokenNumber));
-      return updated
-    })
+    // OPTIMISTIC UPDATE
+    const optimisticData = {
+      ...queueData,
+      patients: queueData.patients.map(p => 
+        p.tokenNumber === servingTokenNumber ? { ...p, status: 'COMPLETED' } : p
+      ),
+      currentToken: null
+    }
+    setQueueData(optimisticData)
     
     try {
-      console.log('[DEBUG] Sending PATCH request to /queue/complete/' + servingTokenNumber);
       const response = await apiRequest(`/queue/complete/${servingTokenNumber}`, {
         method: 'PATCH',
         body: JSON.stringify({ clinic: clinicId })
       })
       
-      console.log('[DEBUG] API RESPONSE RECEIVED');
-      console.log('[DEBUG] response.success:', response?.success);
-      console.log('[DEBUG] response.message:', response?.message);
-      console.log('[DEBUG] response.data exists:', !!response?.data);
-      console.log('[DEBUG] response.data.patients exists:', !!response?.data?.patients);
-      console.log('[DEBUG] response.data.patients is array:', Array.isArray(response?.data?.patients));
-      console.log('[DEBUG] response.data.patients length:', response?.data?.patients?.length);
-      console.log('[DEBUG] Full response:', JSON.stringify(response, null, 2));
-      
-      // CRITICAL FIX: Use backend response data directly (contains full updated queue)
+      // Update state with server response (confirms database persistence)
       if (response?.data?.patients && Array.isArray(response.data.patients)) {
-        console.log('[DEBUG] CONDITION PASSED - response has valid patients array');
-        console.log('[AdminDashboard] Updating queue from backend response with', response.data.patients.length, 'patients')
-        
-        // Verify token is COMPLETED in response
-        const tokenInResponse = response.data.patients.find(p => p.tokenNumber === servingTokenNumber);
-        console.log('[DEBUG] Token #' + servingTokenNumber + ' in response:', tokenInResponse);
-        
-        if (tokenInResponse?.status !== 'COMPLETED') {
-          console.error('[CRITICAL] Backend response shows token is NOT COMPLETED:', tokenInResponse?.status);
-        }
-        
-        const newQueueData = {
+        setQueueData({
           currentToken: response.data.currentServing || null,
           waiting: response.data.waitingCount || 0,
           estimatedTime: response.data.estimatedTime || '0 mins',
           patients: response.data.patients
-        };
-        
-        console.log('[DEBUG] Setting new queue data:', newQueueData);
-        setQueueData(newQueueData);
-        console.log('[DEBUG] State updated successfully');
-      } else {
-        console.error('[ERROR] CONDITION FAILED - Response missing or invalid patients array!');
-        console.error('[ERROR] response?.data?.patients:', response?.data?.patients);
-        console.error('[ERROR] Is array:', Array.isArray(response?.data?.patients));
-        console.error('[ERROR] Full response:', response);
+        })
       }
     } catch (error) {
       console.error('[AdminDashboard] Mark done failed:', error)
-      // REVERT optimistic update on error
+      // On error, refresh to get actual state
       await refreshQueue(true)
     } finally {
       setCompleteLoading(false)
-      console.log('[DEBUG] === MARK DONE END ===');
     }
   }
 
