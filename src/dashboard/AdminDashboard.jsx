@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { CLINICS } from '../data/content'
 import { useAuth } from '../hooks/useAuth'
 import { apiRequest } from '../utils/api'
+import SEOMeta from '../components/SEOMeta'
 
 const REASONS = ['Diabetes Checkup','Thyroid Consultation','Hormone Imbalance','Obesity/Weight','PCOS / PCOD','Gestational Diabetes','Pediatric Endocrinology','Osteoporosis','Adrenal Disorder','Pituitary Disorder','General Consultation','Other']
 
@@ -235,7 +236,9 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F0F4F4', fontFamily: "'DM Sans',sans-serif" }}>
+    <>
+      <SEOMeta pageKey="admin" />
+      <div style={{ minHeight: '100vh', background: '#F0F4F4', fontFamily: "'DM Sans',sans-serif" }}>
 
       {/* ── HEADER ── */}
       <div style={{
@@ -490,6 +493,7 @@ export default function AdminDashboard() {
           input, select, textarea { font-size: 16px !important; }
         }
       `}</style>
-    </div>
+      </div>
+    </>
   )
 }

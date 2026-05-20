@@ -1,6 +1,6 @@
-import { Helmet } from 'react-helmet-async'
 import { motion } from 'framer-motion'
 
+import SEOMeta         from '../components/SEOMeta'
 import Hero            from '../sections/Hero'
 import StatsCounter    from '../sections/StatsCounter'
 import AboutPreview    from '../sections/AboutPreview'
@@ -9,18 +9,11 @@ import ClinicsCard     from '../sections/ClinicsCard'
 import QueuePreview    from './QueuePreview'
 import ReviewsCarousel from '../sections/ReviewsCarousel'
 import BlogPreview     from '../sections/BlogPreview'
-import { DOCTOR }      from '../data/content'
 
 export default function Home() {
   return (
     <>
-      <Helmet>
-        <title>{DOCTOR.name} | Endocrinology Specialist Yelahanka Bengaluru</title>
-        <meta name="description" content={`${DOCTOR.name} — ${DOCTOR.tagline}. Expert care for Diabetes, Thyroid, PCOS and Hormonal disorders in Yelahanka, Bengaluru since 2011.`}/>
-        <meta name="keywords" content="endocrinologist Yelahanka, diabetes doctor Bengaluru, thyroid specialist, PCOS treatment, Dr Praveen Ramachandra"/>
-        <meta property="og:title" content={DOCTOR.name}/>
-        <meta property="og:description" content={DOCTOR.tagline}/>
-      </Helmet>
+      <SEOMeta pageKey="home" structuredData="LocalBusiness" />
 
       {/* 🔥 Page Fade-in */}
       <motion.div

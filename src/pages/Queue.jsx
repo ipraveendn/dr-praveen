@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Helmet } from 'react-helmet-async'
 import { CLINICS, DOCTOR } from '../data/content'
 import { apiRequest } from '../utils/api'
 import { createPaymentOrder, verifyPayment, simulateRazorpayPayment } from '../utils/payment'
+import SEOMeta from '../components/SEOMeta'
 
 const REASONS = ['Diabetes Checkup','Thyroid Consultation','Hormone Imbalance','Obesity/Weight','PCOS / PCOD','Gestational Diabetes','Pediatric Endocrinology','Osteoporosis','Adrenal Disorder','Pituitary Disorder','General Consultation','Other']
 
@@ -218,7 +218,7 @@ export default function Queue() {
 
   return (
     <>
-      <Helmet><title>Book Token | {DOCTOR.name}</title></Helmet>
+      <SEOMeta pageKey="queue" />
       <div style={{ paddingTop: '72px', minHeight: '100vh', background: '#F8FAFA' }}>
 
         {/* Header */}

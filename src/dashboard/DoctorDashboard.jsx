@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { CLINICS, DOCTOR } from '../data/content'
 import { useAuth } from '../hooks/useAuth'
 import { apiRequest } from '../utils/api'
+import SEOMeta from '../components/SEOMeta'
 
 export default function DoctorDashboard() {
   const nav = useNavigate()
@@ -151,7 +152,9 @@ export default function DoctorDashboard() {
   const revenue   = completed.length * 500
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F8FAFA', fontFamily: "'DM Sans',sans-serif" }}>
+    <>
+      <SEOMeta pageKey="doctor" />
+      <div style={{ minHeight: '100vh', background: '#F8FAFA', fontFamily: "'DM Sans',sans-serif" }}>
 
       {/* Topbar */}
       <div style={{ background: 'linear-gradient(135deg,#0B7B6F,#096358)', padding: '0 5%', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 100 }}>
@@ -277,5 +280,6 @@ export default function DoctorDashboard() {
         </div>
       </div>
     </div>
+    </>
   )
 }

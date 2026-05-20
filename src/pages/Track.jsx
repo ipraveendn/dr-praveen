@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Helmet } from 'react-helmet-async'
 import { DOCTOR } from '../data/content'
 import { apiRequest } from '../utils/api'
+import SEOMeta from '../components/SEOMeta'
 
 export default function Track() {
   const params = new URLSearchParams(window.location.search)
@@ -103,7 +103,7 @@ export default function Track() {
 
   return (
     <>
-      <Helmet><title>Track Token | {DOCTOR.name}</title></Helmet>
+      <SEOMeta pageKey="track" />
       <div style={{ paddingTop: '72px', minHeight: '100vh', background: '#F8FAFA' }}>
         <div style={{ background: 'linear-gradient(135deg,#0A1628,#0F2040)', padding: '60px 5%', textAlign: 'center' }}>
           <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 'clamp(32px,4vw,52px)', fontWeight: '700', color: '#fff' }}>

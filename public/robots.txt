@@ -1,0 +1,54 @@
+# Robots.txt for Dr. Praveen Ramachandra Medical Practice
+# Guides search engine crawlers and web robots on how to index the site
+
+# Default rules for all robots/crawlers
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /doctor
+Disallow: /login
+Disallow: /api
+Disallow: /private
+Disallow: /*.js
+Disallow: /*.css
+Disallow: /.env
+Disallow: /.git
+Disallow: /node_modules
+
+# Allow search engines to crawl static assets
+Allow: /*.js?
+Allow: /*.css?
+Allow: /images/
+Allow: /assets/
+
+# Crawl delay (time in seconds to wait between requests)
+Crawl-delay: 1
+
+# Specific rules for Google Bot
+User-agent: Googlebot
+Allow: /
+Disallow: /admin
+Disallow: /doctor
+Disallow: /login
+Disallow: /api
+Crawl-delay: 0
+
+# Specific rules for Bingbot
+User-agent: Bingbot
+Allow: /
+Disallow: /admin
+Disallow: /doctor
+Disallow: /login
+Disallow: /api
+Crawl-delay: 1
+
+# Block bad bots
+User-agent: AhrefsBot
+User-agent: SemrushBot
+User-agent: DotBot
+Disallow: /
+
+# Sitemaps location
+Sitemap: https://drpraveenramachandra.com/sitemap.xml
+Sitemap: https://drpraveenramachandra.com/sitemap-pages.xml
+Sitemap: https://drpraveenramachandra.com/sitemap-blog.xml
