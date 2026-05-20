@@ -39,7 +39,6 @@ function invalidateCache(url) {
   // Invalidate exact match and variations
   for (const [key] of requestCache) {
     if (key.includes(url)) {
-      console.log(`[apiFetch] Invalidating cache for ${key}`)
       requestCache.delete(key)
     }
   }
@@ -55,12 +54,9 @@ export async function apiFetch(url, options = {}) {
   const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
   const method = options.method || 'GET'
   const cacheKey = getCacheKey(url, options)
-  
-  console.log(`[apiFetch] ${method} ${fullUrl}`, { bodySize: options.body ? options.body.length : 0 })
 
   // REQUEST DEDUPLICATION: If same request is already pending, return that promise
   if (pendingRequests.has(cacheKey) && method === 'GET') {
-    console.log(`[apiFetch] Duplicate request detected, returning pending promise for ${cacheKey}`)
     return pendingRequests.get(cacheKey)
   }
 
@@ -68,7 +64,6 @@ export async function apiFetch(url, options = {}) {
   if (method === 'GET' && CACHE_WHITELIST.some(ep => url.includes(ep))) {
     const cached = requestCache.get(cacheKey)
     if (cached && isCacheValid(cached)) {
-      console.log(`[apiFetch] Cache HIT for ${cacheKey}`)
       // Create a fake response from cache - return clone for each caller
       const response = new Response(JSON.stringify(cached.data), {
         status: 200,
@@ -76,7 +71,6 @@ export async function apiFetch(url, options = {}) {
       })
       return response.clone()
     } else if (cached) {
-      console.log(`[apiFetch] Cache EXPIRED for ${cacheKey}`)
       requestCache.delete(cacheKey)
     }
   }
@@ -90,7 +84,6 @@ export async function apiFetch(url, options = {}) {
   const token = localStorage.getItem('token');
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
-    console.log(`[apiFetch] Authorization token attached`)
   }
 
   const finalOptions = { ...options, headers };
@@ -101,14 +94,11 @@ export async function apiFetch(url, options = {}) {
   // Create the fetch promise
   const fetchPromise = (async () => {
     try {
-      console.log(`[apiFetch] Sending ${method} request to ${fullUrl}`)
       const response = await fetch(fullUrl, { ...finalOptions, signal: controller.signal });
       clearTimeout(timeoutId);
-      console.log(`[apiFetch] Response received. Status: ${response.status}`)
       
       // CRITICAL: Invalidate cache after successful mutations on queue endpoints
       if (response.ok && (method === 'POST' || method === 'PATCH') && url.includes('/queue')) {
-        console.log(`[apiFetch] Mutation detected on ${url}, invalidating queue cache`)
         invalidateCache('/queue')
       }
       
@@ -121,11 +111,10 @@ export async function apiFetch(url, options = {}) {
             data,
             timestamp: Date.now()
           })
-          console.log(`[apiFetch] Cached GET response for ${cacheKey}`)
           // Return a clone so each caller gets their own readable stream
           return response.clone()
         } catch (e) {
-          console.log(`[apiFetch] Could not cache response for ${cacheKey}:`, e)
+          // Cache storage failed, continue
         }
       }
       
@@ -163,18 +152,13 @@ export async function apiFetch(url, options = {}) {
 export async function apiFetchJson(url, options = {}) {
   console.log(`[apiFetchJson] Calling apiFetch for ${url}`)
   const response = await apiFetch(url, options);
-  console.log(`[apiFetchJson] Response status: ${response.status}`)
-
   if (response.status === 204) {
-    console.log(`[apiFetchJson] 204 No Content - returning null`)
     return null;
   }
 
   let data;
   try {
-    console.log(`[apiFetchJson] Parsing JSON response...`)
     data = await response.json();
-    console.log(`[apiFetchJson] JSON parsed successfully:`, data)
   } catch (error) {
     console.error(`[JSON PARSE ERROR] ${url}:`, error);
     throw new Error(`Invalid response format from server.`);
@@ -189,7 +173,6 @@ export async function apiFetchJson(url, options = {}) {
     throw error;
   }
 
-  console.log(`[apiFetchJson] Returning parsed data`)
   return data;
 }
 
@@ -201,16 +184,11 @@ export async function apiFetchJson(url, options = {}) {
  * @returns {Promise<Object|null>} - Response data or throws on error.
  */
 export async function apiRequest(url, options = {}, onError = null) {
-  console.log(`[apiRequest] START: ${options.method || 'GET'} ${url}`)
   try {
     const result = await apiFetchJson(url, options)
-    console.log(`[apiRequest] SUCCESS: ${url}`, result)
     return result
   } catch (error) {
     console.error(`[apiRequest] FAILED: ${url}`, error);
-    console.error(`[apiRequest] Error status:`, error?.status);
-    console.error(`[apiRequest] Error message:`, error?.message);
-    console.error(`[apiRequest] Error data:`, error?.data);
     if (onError) {
       onError(error);
     }

@@ -37,12 +37,10 @@ export default function DoctorDashboard() {
     const fetchQueue = async () => {
       // Skip polling for 3 seconds after a mutation to prevent interference
       if (lastMutationTime.current && Date.now() - lastMutationTime.current < 3000) {
-        console.log('[DoctorDashboard] Skipping poll - recent mutation in progress')
         return
       }
       
       try {
-        console.log('[DoctorDashboard] Polling queue for clinic:', clinic)
         const json = await apiRequest(`/queue?clinic=${clinic}`)
         if (!mounted) return
         setQueueData(normalizeQueuePayload(json?.data ?? null))
@@ -66,18 +64,11 @@ export default function DoctorDashboard() {
 
   async function markDone(tokenNumber) {
     if (!tokenNumber) {
-      console.log('[DoctorDashboard] markDone -> no tokenNumber provided')
       return
     }
     if (completeLoading) {
-      console.log('[DoctorDashboard] markDone -> already in progress')
       return
     }
-    
-    console.log('[DoctorDashboard] ============ MARK DONE STARTED ============')
-    console.log('[DoctorDashboard] markDone -> tokenNumber:', tokenNumber)
-    console.log('[DoctorDashboard] markDone -> clinic:', clinic)
-    console.log('[DoctorDashboard] markDone -> token in localStorage:', !!localStorage.getItem('token'))
     
     setCompleteLoading(true)
     
@@ -88,34 +79,19 @@ export default function DoctorDashboard() {
       const endpoint = `/queue/complete/${tokenNumber}`
       const payload = { clinic }
       
-      console.log('[DoctorDashboard] markDone -> API CALL STARTING')
-      console.log('[DoctorDashboard] markDone -> endpoint:', endpoint)
-      console.log('[DoctorDashboard] markDone -> payload:', payload)
-      
       // Mark mutation time to prevent polling interference
       lastMutationTime.current = Date.now()
-      console.log('[DoctorDashboard] markDone -> mutation timestamp set, polling disabled for 3s')
       
       const json = await apiRequest(endpoint, { 
         method: 'PATCH', 
         body: JSON.stringify(payload) 
       })
-      
-      console.log('[DoctorDashboard] markDone -> API SUCCESS')
-      console.log('[DoctorDashboard] markDone -> full response:', json)
-      console.log('[DoctorDashboard] markDone -> response.success:', json?.success)
-      console.log('[DoctorDashboard] markDone -> response.data:', json?.data)
 
       const payload_response = json?.data ?? null
-      console.log('[DoctorDashboard] markDone -> payload exists:', !!payload_response)
-      console.log('[DoctorDashboard] markDone -> payload.patients is array:', Array.isArray(payload_response?.patients))
-      console.log('[DoctorDashboard] markDone -> payload.patients length:', payload_response?.patients?.length)
       
       if (payload_response && Array.isArray(payload_response.patients)) {
-        console.log('[DoctorDashboard] markDone -> processing patients from response')
         const normalized = payload_response.patients.map((p) => {
           const s = String(p.status || '').toUpperCase()
-          console.log(`[DoctorDashboard] Token #${p.tokenNumber}: status = ${s}`)
           return { ...p, status: s }
         })
 
@@ -125,7 +101,6 @@ export default function DoctorDashboard() {
           estimatedTime: payload_response.estimatedTime || '0 mins',
           patients: normalized,
         }
-        console.log('[DoctorDashboard] markDone -> setting queue data:', newData)
         
         // Check if there's a new SERVING patient
         const newServing = normalized.find(p => p.status === 'SERVING')

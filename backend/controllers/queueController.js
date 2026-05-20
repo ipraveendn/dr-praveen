@@ -27,7 +27,6 @@ const getEndOfDay = () => {
 
 
 export const addToken = async (req, res) => {
-  console.log("[addToken] STEP 1: Request received for new token.");
   const { name, phone, email, place, reason, clinic, trackingUrl } = req.body;
 
   if (!name || !phone || !reason || !clinic) {
@@ -39,14 +38,12 @@ export const addToken = async (req, res) => {
     const todayStart = getStartOfDay();
     const todayEnd = getEndOfDay();
 
-    console.log(`[addToken] STEP 2: Upserting clinic: ${clinic}`);
     const clinicRecord = await prisma.clinic.upsert({
       where: { name: clinic },
       update: {},
       create: { name: clinic, address: 'Address not specified' },
     });
 
-    console.log(`[addToken] STEP 3: Upserting patient with phone: ${phone}`);
     const generatedPatientId = `PAT_${Date.now()}`;
     const patient = await prisma.patient.upsert({
       where: { phone: String(phone) },
@@ -56,16 +53,12 @@ export const addToken = async (req, res) => {
         clinicId: clinicRecord.id, clinicName: clinic },
     });
     
-    // DEBUG LOG as requested
-    console.log("PATIENT OBJECT =", patient);
-
     // SAFETY GUARD as requested
     if (!patient || !patient.id) {
         console.error("[addToken] FATAL: Patient object or patient.id is missing after upsert.");
         return res.status(500).json({ success: false, message: "Failed to create patient record. Cannot proceed." });
     }
 
-    console.log(`[addToken] STEP 4: Fetching last token for clinicId ${clinicRecord.id} today.`);
     const lastToken = await prisma.token.findFirst({
       where: {
         clinicId: clinicRecord.id,
@@ -75,11 +68,6 @@ export const addToken = async (req, res) => {
     });
 
     const nextTokenNumber = lastToken ? lastToken.tokenNumber + 1 : 1;
-    console.log(`[addToken] STEP 5: Next token number is ${nextTokenNumber}.`);
-
-    // DEBUG LOGS - as requested
-    console.log("patient.id =", patient.id);
-    console.log("patient.patientId =", patient.patientId);
 
     console.log("[addToken] STEP 6: Creating the new token in the database.");
     const tokenRecord = await prisma.token.create({
@@ -93,8 +81,7 @@ export const addToken = async (req, res) => {
         appointmentDate: new Date(),
       },
     });
-    console.log("[addToken] STEP 7: Token created successfully:", tokenRecord);
-
+    
     const waitingCount = await prisma.token.count({ where: { status: 'WAITING', clinicId: clinicRecord.id, appointmentDate: { gte: todayStart, lte: todayEnd } } });
     const estimatedTime = (waitingCount - 1) * 5;
     sendTokenNotificationSMS({
@@ -102,7 +89,6 @@ export const addToken = async (req, res) => {
     }).catch(smsError => console.error("[addToken] SMS sending failed:", smsError));
     
     // CRITICAL FIX: Return complete queue state instead of just the token
-    console.log("[addToken] STEP 8: Fetching complete queue state");
     const allTokens = await prisma.token.findMany({
       where: {
         clinicId: clinicRecord.id,
@@ -115,7 +101,6 @@ export const addToken = async (req, res) => {
     const servingToken = allTokens.find(t => t.status === 'SERVING');
     const allWaiting = allTokens.filter(t => t.status === 'WAITING');
 
-    console.log("[addToken] STEP 9: Sending success response with complete queue to client.");
     return res.status(201).json({ 
       success: true, 
       data: { 
@@ -152,8 +137,6 @@ export const getQueueData = async (req, res) => {
     const endOfDay = new Date();
     endOfDay.setHours(23, 59, 59, 999);
 
-    console.log(`[getQueueData] Fetching queue data. Clinic: ${clinic || 'all'}`);
-
     let whereClause = {};
 
     if (clinic) {
@@ -168,7 +151,6 @@ export const getQueueData = async (req, res) => {
     }
 
     // OPTIMIZED: Use select to fetch only needed fields, avoid N+1
-    console.log(`[getQueueData] Executing optimized token query with clinic filter:`, whereClause);
     const tokens = await prisma.token.findMany({
       where: {
         ...whereClause,
@@ -197,14 +179,10 @@ export const getQueueData = async (req, res) => {
       }
     });
 
-    console.log(`[getQueueData] Fetched ${tokens.length} tokens`);
-
     // Process data
     const servingToken = tokens.find(t => t.status === 'SERVING');
     const waitingTokens = tokens.filter(t => t.status === 'WAITING');
     const completedTokens = tokens.filter(t => t.status === 'COMPLETED');
-    
-    console.log(`[getQueueData] Stats - Serving: ${servingToken ? 1 : 0}, Waiting: ${waitingTokens.length}, Completed: ${completedTokens.length}`);
     
     const responseData = {
       currentToken: servingToken ? servingToken.tokenNumber : null,
@@ -221,7 +199,7 @@ export const getQueueData = async (req, res) => {
       })),
     };
 
-    console.log(`[getQueueData] Returning queue data with ${responseData.patients.length} patients`);
+
     return res.status(200).json({
       success: true,
       data: responseData
@@ -297,19 +275,14 @@ export const callNextPatient = async (req, res) => {
     const todayStart = getStartOfDay();
     const todayEnd = getEndOfDay();
 
-    console.log(`[callNextPatient] Looking up clinic record: ${clinic}`);
     const clinicRecord = await prisma.clinic.findUnique({ where: { name: clinic } });
     if (!clinicRecord) {
       console.error(`[callNextPatient] Clinic not found: ${clinic}`);
-      return res.status(404).json({ success: false, message: `Clinic \"${clinic}\" not found.` });
+      return res.status(404).json({ success: false, message: `Clinic "${clinic}" not found.` });
     }
-    
-    console.log(`[callNextPatient] Clinic found: ${clinicRecord.id}`);
-    console.log(`[callNextPatient] TRANSACTION START`);
     
     const result = await prisma.$transaction(async (tx) => {
       // Step 1: Find current SERVING token
-      console.log(`[callNextPatient] TX STEP 1: Finding SERVING token`);
       const currentServing = await tx.token.findFirst({
         where: {
           clinicId: clinicRecord.id,
@@ -321,20 +294,15 @@ export const callNextPatient = async (req, res) => {
 
       let previousTokenNumber = null;
       if (currentServing) {
-        console.log(`[callNextPatient] TX STEP 2: BEFORE UPDATE - Token #${currentServing.tokenNumber} status: ${currentServing.status}`);
         const updated = await tx.token.update({
           where: { id: currentServing.id },
           data: { status: 'COMPLETED' },
           include: { patient: true }
         });
-        console.log(`[callNextPatient] TX STEP 2: AFTER UPDATE - Token #${updated.tokenNumber} status: ${updated.status}`);
         previousTokenNumber = updated.tokenNumber;
-      } else {
-        console.log(`[callNextPatient] TX STEP 2: No SERVING token found`);
       }
 
       // Step 2: Find next WAITING token (in order)
-      console.log(`[callNextPatient] TX STEP 3: Finding next WAITING token`);
       const nextPatientToken = await tx.token.findFirst({
         where: {
           clinicId: clinicRecord.id,
@@ -346,8 +314,6 @@ export const callNextPatient = async (req, res) => {
       });
 
       if (!nextPatientToken) {
-        console.log(`[callNextPatient] TX STEP 4: No more WAITING patients`);
-        
         // Fetch all tokens to get complete state (in case only COMPLETED tokens remain)
         const allTokens = await tx.token.findMany({
           where: {
@@ -380,16 +346,13 @@ export const callNextPatient = async (req, res) => {
       }
 
       // Step 3: Update next token to SERVING (atomic - within transaction)
-      console.log(`[callNextPatient] TX STEP 4: BEFORE UPDATE - Token #${nextPatientToken.tokenNumber} status: ${nextPatientToken.status}`);
       const updated = await tx.token.update({
         where: { id: nextPatientToken.id },
         data: { status: 'SERVING' },
         include: { patient: true }
       });
-      console.log(`[callNextPatient] TX STEP 4: AFTER UPDATE - Token #${updated.tokenNumber} status: ${updated.status}`);
 
       // Step 4: Fetch COMPLETE updated queue state for response
-      console.log(`[callNextPatient] TX STEP 5: Fetching complete queue state`);
       const allTokens = await tx.token.findMany({
         where: {
           clinicId: clinicRecord.id,
@@ -399,16 +362,9 @@ export const callNextPatient = async (req, res) => {
         include: { patient: true }
       });
 
-      console.log(`[callNextPatient] TX: Queue snapshot:`, allTokens.map(t => ({ tokenNumber: t.tokenNumber, status: t.status })));
-      
       // ⚠️ CRITICAL: Verify both updates happened correctly
       const verifyCompleted = allTokens.find(t => t.tokenNumber === previousTokenNumber);
       const verifyServing = allTokens.find(t => t.tokenNumber === updated.tokenNumber);
-      
-      console.log(`[callNextPatient] VERIFICATION:`, {
-        previousToken: verifyCompleted ? `#${verifyCompleted.tokenNumber} status=${verifyCompleted.status}` : 'NOT FOUND',
-        newServingToken: verifyServing ? `#${verifyServing.tokenNumber} status=${verifyServing.status}` : 'NOT FOUND'
-      });
       
       if (verifyCompleted && verifyCompleted.status !== 'COMPLETED') {
         console.error(`[CRITICAL] Previous token #${previousTokenNumber} not COMPLETED, shows: ${verifyCompleted.status}`);
@@ -441,13 +397,9 @@ export const callNextPatient = async (req, res) => {
       };
     });
 
-    console.log(`[callNextPatient] TRANSACTION COMPLETE - SUCCESS`);
-    console.log('[callNextPatient] ============ END (SUCCESS) ============');
     return res.status(200).json(result);
   } catch (error) {
-    console.error(`[callNextPatient] ============ TRANSACTION FAILED ============`);
-    console.error(`[callNextPatient] Error message:`, error.message);
-    console.error(`[callNextPatient] Error stack:`, error.stack);
+    console.error(`[callNextPatient] Error:`, error.message);
     return res.status(500).json({ success: false, message: "Internal Server Error.", error: error.message });
   }
 };

@@ -30,19 +30,16 @@ export default function AdminDashboard() {
     
     // Skip refresh if mutation in progress (within 3 seconds)
     if (lastMutationTime.current && now - lastMutationTime.current < 3000 && !forceRefresh) {
-      console.log('[AdminDashboard] Skipping refresh - recent mutation in progress')
       return
     }
     
     // Debounce: don't refresh if we just refreshed (within 200ms)
     if (!forceRefresh && lastRefreshTime.current[cacheKey] && now - lastRefreshTime.current[cacheKey] < 200) {
-      console.log('[AdminDashboard] Skipping refresh - cache fresh')
       return
     }
     
     // Prevent duplicate requests
     if (pendingRequests.current[cacheKey]) {
-      console.log('[AdminDashboard] Duplicate request prevented for', cacheKey)
       return
     }
 
@@ -50,10 +47,8 @@ export default function AdminDashboard() {
     lastRefreshTime.current[cacheKey] = now
 
     try {
-      console.log('[AdminDashboard] Fetching queue for clinic:', clinicId)
       const json = await apiRequest(`/queue?clinic=${clinicId}`)
       setQueueData(json?.data ?? null)
-      console.log('[AdminDashboard] Queue data updated:', json?.data)
     } catch (error) {
       console.error('[AdminDashboard] Queue fetch failed:', error)
       setQueueData(null)
@@ -65,7 +60,6 @@ export default function AdminDashboard() {
 
   // Load initial queue data on clinic change
   useEffect(() => {
-    console.log('[AdminDashboard] Clinic changed to:', clinicId)
     setQueueLoading(true)
     refreshQueue(true)
   }, [clinicId, refreshQueue])
@@ -80,16 +74,13 @@ export default function AdminDashboard() {
     if (!form.name || !form.phone || !form.reason) return
     setAdding(true)
     try {
-      console.log('[AdminDashboard] Adding patient:', form)
       const response = await apiRequest('/queue/add', {
         method: 'POST',
         body: JSON.stringify({ name: form.name, phone: form.phone, reason: form.reason, clinic: clinicId })
       })
-      console.log('[AdminDashboard] Patient added successfully, response:', response)
       
       // Update queue with response data if available
       if (response?.data?.patients) {
-        console.log('[AdminDashboard] Updating queue from add response')
         setQueueData({
           currentToken: response.data.currentToken || queueData?.currentToken,
           waiting: response.data.patients.filter(p => p.status === 'WAITING').length,
@@ -111,37 +102,25 @@ export default function AdminDashboard() {
 
   async function callNext() {
     if (waiting.length === 0 || actionLoading) {
-      console.log('[AdminDashboard] callNext -> Conditions not met. Waiting:', waiting.length, 'Loading:', actionLoading)
       return
     }
-    
-    console.log('[AdminDashboard] ============ CALL NEXT STARTED ============')
-    console.log('[AdminDashboard] callNext -> clinic:', clinicId)
-    console.log('[AdminDashboard] callNext -> waiting count:', waiting.length)
-    console.log('[AdminDashboard] callNext -> token in localStorage:', !!localStorage.getItem('token'))
     
     setActionLoading(true)
     
     // Mark mutation time to prevent auto-refresh interference
     lastMutationTime.current = Date.now()
-    console.log('[AdminDashboard] callNext -> mutation timestamp set, auto-refresh disabled for 3s')
     
     // OPTIMISTIC UPDATE
     const nextPatient = waiting[0]
     const currentServing = serving
-    console.log('[AdminDashboard] callNext -> OPTIMISTIC UPDATE')
-    console.log('[AdminDashboard] callNext -> next patient:', nextPatient.tokenNumber)
-    console.log('[AdminDashboard] callNext -> current serving:', currentServing?.tokenNumber)
     
     const optimisticData = {
       ...queueData,
       patients: queueData.patients.map(p => {
         if (p.tokenNumber === currentServing?.tokenNumber) {
-          console.log(`[AdminDashboard] Token #${p.tokenNumber}: SERVING -> COMPLETED (optimistic)`)
           return { ...p, status: 'COMPLETED' }
         }
         if (p.tokenNumber === nextPatient.tokenNumber) {
-          console.log(`[AdminDashboard] Token #${p.tokenNumber}: WAITING -> SERVING (optimistic)`)
           return { ...p, status: 'SERVING' }
         }
         return p
@@ -151,17 +130,10 @@ export default function AdminDashboard() {
     setQueueData(optimisticData)
     
     try {
-      console.log('[AdminDashboard] callNext -> API CALL STARTING')
-      console.log('[AdminDashboard] callNext -> endpoint: /queue/next')
-      console.log('[AdminDashboard] callNext -> payload:', { clinic: clinicId })
-      
       const response = await apiRequest('/queue/next', { 
         method: 'POST', 
         body: JSON.stringify({ clinic: clinicId }) 
       })
-      
-      console.log('[AdminDashboard] callNext -> API SUCCESS')
-      console.log('[AdminDashboard] callNext -> response:', response)
       
       // Update state with server response
       if (response?.data?.patients && Array.isArray(response.data.patients)) {
@@ -172,25 +144,15 @@ export default function AdminDashboard() {
           estimatedTime: response.data.estimatedTime || '0 mins',
           patients: response.data.patients
         }
-        console.log('[AdminDashboard] callNext -> new state:', newData)
         setQueueData(newData)
-        console.log('[AdminDashboard] ============ CALL NEXT SUCCESS ============')
       } else {
-        console.log('[AdminDashboard] callNext -> response missing patients array, refreshing')
         await refreshQueue(true)
       }
     } catch (error) {
-      console.error('[AdminDashboard] ============ CALL NEXT FAILED ============')
       console.error('[AdminDashboard] callNext error:', error)
-      console.error('[AdminDashboard] callNext error status:', error?.status)
-      console.error('[AdminDashboard] callNext error data:', error?.data)
-      console.error('[AdminDashboard] callNext error message:', error?.message)
-      
       if (error?.status === 401) {
         console.error('[CRITICAL] Authentication failed - token invalid or expired')
       }
-      
-      console.log('[AdminDashboard] callNext -> forcing refresh due to error')
       await refreshQueue(true)
     } finally {
       setActionLoading(false)
@@ -199,25 +161,16 @@ export default function AdminDashboard() {
 
   async function markDone() {
     if (!serving?.tokenNumber || completeLoading) {
-      console.log('[AdminDashboard] markDone -> Conditions not met. Serving:', serving?.tokenNumber, 'Loading:', completeLoading)
       return
     }
-    
-    console.log('[AdminDashboard] ============ MARK DONE STARTED ============')
-    console.log('[AdminDashboard] markDone -> serving token:', serving.tokenNumber)
-    console.log('[AdminDashboard] markDone -> clinic:', clinicId)
-    console.log('[AdminDashboard] markDone -> token in localStorage:', !!localStorage.getItem('token'))
     
     setCompleteLoading(true)
     const servingTokenNumber = serving.tokenNumber
     
     // Mark mutation time to prevent auto-refresh interference
     lastMutationTime.current = Date.now()
-    console.log('[AdminDashboard] markDone -> mutation timestamp set, auto-refresh disabled for 3s')
     
     // OPTIMISTIC UPDATE
-    console.log('[AdminDashboard] markDone -> OPTIMISTIC UPDATE')
-    console.log(`[AdminDashboard] Token #${servingTokenNumber}: SERVING -> COMPLETED (optimistic)`)
     const optimisticData = {
       ...queueData,
       patients: queueData.patients.map(p => 
@@ -249,27 +202,15 @@ export default function AdminDashboard() {
           estimatedTime: response.data.estimatedTime || '0 mins',
           patients: response.data.patients
         }
-        console.log('[AdminDashboard] markDone -> new state:', newData)
         setQueueData(newData)
-        console.log('[AdminDashboard] ============ MARK DONE SUCCESS ============')
       } else {
-        console.log('[AdminDashboard] markDone -> response missing patients array, refreshing')
         await refreshQueue(true)
       }
     } catch (error) {
-      console.error('[AdminDashboard] ============ MARK DONE FAILED ============')
-      console.error('[AdminDashboard] Mark done failed with error:', error);
-      console.error('[AdminDashboard] Error status:', error?.status);
-      console.error('[AdminDashboard] Error data:', error?.data);
-      console.error('[AdminDashboard] Error message:', error?.message);
-      
-      // Check if it's a 401 (not authenticated)
+      console.error('[AdminDashboard] Mark done failed with error:', error)
       if (error?.status === 401) {
-        console.error('[CRITICAL AUTH ERROR] Not authenticated - token may be invalid or expired');
+        console.error('[CRITICAL AUTH ERROR] Not authenticated - token may be invalid or expired')
       }
-      
-      // REVERT optimistic update on error - refresh to get actual state
-      console.log('[AdminDashboard] markDone -> forcing refresh due to error')
       await refreshQueue(true)
     } finally {
       setCompleteLoading(false)
