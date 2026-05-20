@@ -15,7 +15,7 @@ const API_TIMEOUT = config.API_TIMEOUT;
 const requestCache = new Map()
 const pendingRequests = new Map()
 
-const CACHE_DURATION = 1000 // 1 second - short cache to avoid stale data
+const CACHE_DURATION = 100 // 100ms - very short cache to prevent stale data
 const CACHE_WHITELIST = ['/queue'] // Only cache these endpoints
 
 /**
@@ -198,10 +198,16 @@ export async function apiFetchJson(url, options = {}) {
  * @returns {Promise<Object|null>} - Response data or throws on error.
  */
 export async function apiRequest(url, options = {}, onError = null) {
+  console.log(`[apiRequest] START: ${options.method || 'GET'} ${url}`)
   try {
-    return await apiFetchJson(url, options);
+    const result = await apiFetchJson(url, options)
+    console.log(`[apiRequest] SUCCESS: ${url}`, result)
+    return result
   } catch (error) {
-    console.error(`[API REQUEST ERROR] ${url}:`, error);
+    console.error(`[apiRequest] FAILED: ${url}`, error);
+    console.error(`[apiRequest] Error status:`, error?.status);
+    console.error(`[apiRequest] Error message:`, error?.message);
+    console.error(`[apiRequest] Error data:`, error?.data);
     if (onError) {
       onError(error);
     }

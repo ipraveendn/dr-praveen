@@ -21,9 +21,9 @@ export default function DoctorDashboard() {
     const nextPayload = { ...payload }
     if (Array.isArray(nextPayload.patients)) {
       nextPayload.patients = nextPayload.patients.map((p) => {
+        // Keep status as-is from backend: WAITING, SERVING, COMPLETED (uppercase)
         const s = String(p.status || '').toUpperCase()
-        const mapped = s === 'COMPLETED' ? 'done' : s.toLowerCase()
-        return { ...p, status: mapped }
+        return { ...p, status: s }
       })
     }
     return nextPayload
@@ -35,6 +35,7 @@ export default function DoctorDashboard() {
 
     const fetchQueue = async () => {
       try {
+        console.log('[DoctorDashboard] Polling queue for clinic:', clinic)
         const json = await apiRequest(`/queue?clinic=${clinic}`)
         if (!mounted) return
         setQueueData(normalizeQueuePayload(json?.data ?? null))
@@ -48,7 +49,7 @@ export default function DoctorDashboard() {
     }
 
     fetchQueue()
-    intervalId = setInterval(fetchQueue, 4000)
+    intervalId = setInterval(fetchQueue, 2000) // 2 second polling for faster updates
 
     return () => {
       mounted = false
@@ -57,35 +58,84 @@ export default function DoctorDashboard() {
   }, [clinic])
 
   async function markDone(tokenNumber) {
-    if (!tokenNumber) return
-    if (completeLoading) return
+    if (!tokenNumber) {
+      console.log('[DoctorDashboard] markDone -> no tokenNumber provided')
+      return
+    }
+    if (completeLoading) {
+      console.log('[DoctorDashboard] markDone -> already in progress')
+      return
+    }
+    
+    console.log('[DoctorDashboard] ============ MARK DONE STARTED ============')
+    console.log('[DoctorDashboard] markDone -> tokenNumber:', tokenNumber)
+    console.log('[DoctorDashboard] markDone -> clinic:', clinic)
+    console.log('[DoctorDashboard] markDone -> token in localStorage:', !!localStorage.getItem('token'))
+    
     setCompleteLoading(true)
     try {
-      console.log('[DoctorDashboard] markDone -> sending PATCH complete for token', tokenNumber, 'clinic', clinic)
-      const json = await apiRequest(`/queue/complete/${tokenNumber}`, { method: 'PATCH', body: JSON.stringify({ clinic }) })
-      console.log('[DoctorDashboard] markDone -> response', json)
+      const endpoint = `/queue/complete/${tokenNumber}`
+      const payload = { clinic }
+      
+      console.log('[DoctorDashboard] markDone -> API CALL STARTING')
+      console.log('[DoctorDashboard] markDone -> endpoint:', endpoint)
+      console.log('[DoctorDashboard] markDone -> payload:', payload)
+      
+      const json = await apiRequest(endpoint, { 
+        method: 'PATCH', 
+        body: JSON.stringify(payload) 
+      })
+      
+      console.log('[DoctorDashboard] markDone -> API SUCCESS')
+      console.log('[DoctorDashboard] markDone -> full response:', json)
+      console.log('[DoctorDashboard] markDone -> response.success:', json?.success)
+      console.log('[DoctorDashboard] markDone -> response.data:', json?.data)
 
-      const payload = json?.data ?? null
-      if (payload && Array.isArray(payload.patients)) {
-        const normalized = payload.patients.map((p) => {
+      const payload_response = json?.data ?? null
+      console.log('[DoctorDashboard] markDone -> payload exists:', !!payload_response)
+      console.log('[DoctorDashboard] markDone -> payload.patients is array:', Array.isArray(payload_response?.patients))
+      console.log('[DoctorDashboard] markDone -> payload.patients length:', payload_response?.patients?.length)
+      
+      if (payload_response && Array.isArray(payload_response.patients)) {
+        console.log('[DoctorDashboard] markDone -> normalizing patients')
+        const normalized = payload_response.patients.map((p) => {
           const s = String(p.status || '').toUpperCase()
-          const mapped = s === 'COMPLETED' ? 'done' : s.toLowerCase()
-          return { ...p, status: mapped }
+          console.log(`[DoctorDashboard] Token #${p.tokenNumber}: status = ${s}`)
+          return { ...p, status: s }
         })
 
-        setQueueData({
-          currentToken: payload.currentToken ?? null,
-          waiting: payload.waiting ?? 0,
-          estimatedTime: payload.estimatedTime ?? '0 mins',
+        const newData = {
+          currentToken: payload_response.currentToken ?? null,
+          waiting: payload_response.waiting ?? 0,
+          estimatedTime: payload_response.estimatedTime ?? '0 mins',
           patients: normalized,
-        })
+        }
+        console.log('[DoctorDashboard] markDone -> setting queue data:', newData)
+        setQueueData(newData)
+        console.log('[DoctorDashboard] ============ MARK DONE SUCCESS ============')
       } else {
-        // Fallback: force a refresh if backend returned only a partial response
+        console.log('[DoctorDashboard] markDone -> payload is invalid, forcing refresh')
         const refresh = await apiRequest(`/queue?clinic=${clinic}`)
+        console.log('[DoctorDashboard] markDone -> refresh response:', refresh?.data)
         setQueueData(normalizeQueuePayload(refresh?.data ?? null))
       }
     } catch (e) {
+      console.error('[DoctorDashboard] ============ MARK DONE FAILED ============')
       console.error('[DoctorDashboard] markDone error:', e)
+      console.error('[DoctorDashboard] markDone error status:', e?.status)
+      console.error('[DoctorDashboard] markDone error data:', e?.data)
+      console.error('[DoctorDashboard] markDone error message:', e?.message)
+      
+      if (e?.status === 401) {
+        console.error('[CRITICAL] Authentication failed - token invalid or expired')
+      }
+      
+      try {
+        const refresh = await apiRequest(`/queue?clinic=${clinic}`)
+        setQueueData(normalizeQueuePayload(refresh?.data ?? null))
+      } catch (refreshError) {
+        console.error('[DoctorDashboard] markDone refresh fallback failed:', refreshError)
+      }
     } finally {
       setCompleteLoading(false)
     }
@@ -94,9 +144,9 @@ export default function DoctorDashboard() {
   // logout function provided by useAuth hook
 
   const apiPatients = Array.isArray(queueData?.patients) ? queueData.patients : []
-  const serving = apiPatients.find(p => p.status === 'serving') ?? null
-  const waiting = apiPatients.filter(p => p.status === 'waiting')
-  const completed = apiPatients.filter(p => p.status === 'done')
+  const serving = apiPatients.find(p => p.status === 'SERVING') ?? null
+  const waiting = apiPatients.filter(p => p.status === 'WAITING')
+  const completed = apiPatients.filter(p => p.status === 'COMPLETED')
   const revenue   = completed.length * 500
 
   return (

@@ -211,6 +211,7 @@ export const getQueueData = async (req, res) => {
       waiting: waitingTokens.length,
       estimatedTime: `${waitingTokens.length * 5} mins`,
       patients: tokens.map(t => ({
+        id: t.patient.id,
         tokenNumber: t.tokenNumber,
         name: t.patient.name,
         status: t.status,
@@ -282,6 +283,11 @@ export const trackQueue = async (req, res) => {
 
 export const callNextPatient = async (req, res) => {
   const { clinic } = req.body;
+  
+  console.log('[callNextPatient] ============ START ============');
+  console.log('[callNextPatient] Clinic:', clinic);
+  console.log('[callNextPatient] User:', req.user?.username);
+  
   if (!clinic) {
     console.error('[callNextPatient] Missing clinic parameter');
     return res.status(400).json({ success: false, message: "Clinic is required." });
@@ -291,15 +297,16 @@ export const callNextPatient = async (req, res) => {
     const todayStart = getStartOfDay();
     const todayEnd = getEndOfDay();
 
-    console.log(`[callNextPatient] START: Clinic ${clinic}`);
+    console.log(`[callNextPatient] Looking up clinic record: ${clinic}`);
     const clinicRecord = await prisma.clinic.findUnique({ where: { name: clinic } });
     if (!clinicRecord) {
       console.error(`[callNextPatient] Clinic not found: ${clinic}`);
       return res.status(404).json({ success: false, message: `Clinic \"${clinic}\" not found.` });
     }
-
-    // Use transaction to ensure atomic updates (prevents race condition)
+    
+    console.log(`[callNextPatient] Clinic found: ${clinicRecord.id}`);
     console.log(`[callNextPatient] TRANSACTION START`);
+    
     const result = await prisma.$transaction(async (tx) => {
       // Step 1: Find current SERVING token
       console.log(`[callNextPatient] TX STEP 1: Finding SERVING token`);
@@ -340,13 +347,34 @@ export const callNextPatient = async (req, res) => {
 
       if (!nextPatientToken) {
         console.log(`[callNextPatient] TX STEP 4: No more WAITING patients`);
+        
+        // Fetch all tokens to get complete state (in case only COMPLETED tokens remain)
+        const allTokens = await tx.token.findMany({
+          where: {
+            clinicId: clinicRecord.id,
+            appointmentDate: { gte: todayStart, lte: todayEnd }
+          },
+          orderBy: { tokenNumber: 'asc' },
+          include: { patient: true }
+        });
+        
         return {
           success: true,
           message: "No more patients are waiting in the queue.",
           data: {
             previousCompleted: previousTokenNumber,
-            nextTokenNumber: null,
-            queueUpdated: true
+            nextServing: null,
+            currentToken: null,
+            queueUpdated: true,
+            waiting: 0,
+            estimatedTime: "0 mins",
+            patients: allTokens.map(t => ({
+              id: t.patient.id,
+              tokenNumber: t.tokenNumber,
+              name: t.patient.name,
+              status: t.status,
+              phone: t.patient.phone
+            }))
           }
         };
       }
@@ -389,14 +417,21 @@ export const callNextPatient = async (req, res) => {
         console.error(`[CRITICAL] New token #${updated.tokenNumber} not SERVING, shows: ${verifyServing.status}`);
       }
 
+      const waitingTokens = allTokens.filter(t => t.status === 'WAITING');
+      
       return {
         success: true,
         message: `Calling next patient, Token #${updated.tokenNumber}.`,
         data: {
           previousCompleted: previousTokenNumber,
           nextServing: updated.tokenNumber,
+          currentToken: updated.tokenNumber,
           queueUpdated: true,
+          // Calculate stats from all tokens
+          waiting: waitingTokens.length,
+          estimatedTime: `${waitingTokens.length * 5} mins`,
           patients: allTokens.map(t => ({
+            id: t.patient.id,
             tokenNumber: t.tokenNumber,
             name: t.patient.name,
             status: t.status,
@@ -407,9 +442,12 @@ export const callNextPatient = async (req, res) => {
     });
 
     console.log(`[callNextPatient] TRANSACTION COMPLETE - SUCCESS`);
+    console.log('[callNextPatient] ============ END (SUCCESS) ============');
     return res.status(200).json(result);
   } catch (error) {
-    console.error(`[callNextPatient] TRANSACTION FAILED:`, error);
+    console.error(`[callNextPatient] ============ TRANSACTION FAILED ============`);
+    console.error(`[callNextPatient] Error message:`, error.message);
+    console.error(`[callNextPatient] Error stack:`, error.stack);
     return res.status(500).json({ success: false, message: "Internal Server Error.", error: error.message });
   }
 };
@@ -417,6 +455,11 @@ export const callNextPatient = async (req, res) => {
 export const completeConsultationByTokenNumber = async (req, res) => {
     const tokenNumber = Number(req.params.tokenNumber);
     const { clinic } = req.body;
+
+    console.log('[completeConsultationByTokenNumber] ============ START ============');
+    console.log('[completeConsultationByTokenNumber] Token number:', tokenNumber);
+    console.log('[completeConsultationByTokenNumber] Clinic:', clinic);
+    console.log('[completeConsultationByTokenNumber] User:', req.user?.username);
 
     if (!tokenNumber || isNaN(tokenNumber)) {
         console.error('[completeConsultationByTokenNumber] Invalid token number:', req.params.tokenNumber);
@@ -433,20 +476,25 @@ export const completeConsultationByTokenNumber = async (req, res) => {
         };
 
         if (clinic) {
+            console.log('[completeConsultationByTokenNumber] Looking up clinic:', clinic);
             const clinicRecord = await prisma.clinic.findUnique({ where: { name: clinic } });
             if (!clinicRecord) {
                 console.error(`[completeConsultationByTokenNumber] Clinic not found: ${clinic}`);
                 return res.status(404).json({ success: false, message: `Clinic ${clinic} not found.` });
             }
+            console.log('[completeConsultationByTokenNumber] Clinic ID:', clinicRecord.id);
             whereClause.clinicId = clinicRecord.id;
         }
 
+        console.log('[completeConsultationByTokenNumber] Query clause:', whereClause);
         const token = await prisma.token.findFirst({ where: whereClause });
 
         if (!token) {
             console.error(`[completeConsultationByTokenNumber] Token #${tokenNumber} not found for today`);
             return res.status(404).json({ success: false, message: "Token not found for the current day." });
         }
+
+        console.log('[completeConsultationByTokenNumber] Token found:', { id: token.id, status: token.status });
 
         // IMPORTANT: Only allow completing SERVING or WAITING tokens
         if (token.status !== 'SERVING' && token.status !== 'WAITING') {
@@ -457,6 +505,7 @@ export const completeConsultationByTokenNumber = async (req, res) => {
             });
         }
 
+        console.log('[completeConsultationByTokenNumber] TRANSACTION: Starting...');
         // USE TRANSACTION to ensure atomic update
         const result = await prisma.$transaction(async (tx) => {
             console.log(`[completeConsultationByTokenNumber] TRANSACTION: Marking token #${tokenNumber} as COMPLETED`);
@@ -468,7 +517,8 @@ export const completeConsultationByTokenNumber = async (req, res) => {
                 include: { patient: true }
             });
 
-            console.log(`[completeConsultationByTokenNumber] TRANSACTION: Token #${tokenNumber} updated. Status: ${updated.status}`);
+            console.log(`[completeConsultationByTokenNumber] TRANSACTION: Updated token #${tokenNumber} to COMPLETED`);
+            console.log('[completeConsultationByTokenNumber] TRANSACTION: Verifying update...');
 
             // CRITICAL: Re-query immediately within same transaction to verify
             const verification = await tx.token.findUnique({
@@ -479,22 +529,28 @@ export const completeConsultationByTokenNumber = async (req, res) => {
                 throw new Error(`Database transaction failed: Token status is ${verification.status}, expected COMPLETED`);
             }
 
-            console.log(`[completeConsultationByTokenNumber] TRANSACTION: Verification passed. Status confirmed as COMPLETED`);
+            console.log(`[completeConsultationByTokenNumber] TRANSACTION: Verification PASSED - Token #${tokenNumber} is COMPLETED`);
 
             // Fetch ALL tokens for the clinic to return complete queue state
+            console.log('[completeConsultationByTokenNumber] TRANSACTION: Fetching all tokens for clinic...');
             const allTokens = await tx.token.findMany({
                 where: {
                     clinicId: token.clinicId,
                     appointmentDate: { gte: todayStart, lte: todayEnd }
                 },
                 orderBy: { tokenNumber: 'asc' },
-                include: { patient: true }
+                include: { patient: true, clinic: true }
             });
 
             console.log(`[completeConsultationByTokenNumber] TRANSACTION: Queue has ${allTokens.length} tokens`);
+            console.log('[completeConsultationByTokenNumber] TRANSACTION: Queue state:', 
+              allTokens.map(t => ({ num: t.tokenNumber, status: t.status })));
 
             const servingToken = allTokens.find(t => t.status === 'SERVING');
             const waitingTokens = allTokens.filter(t => t.status === 'WAITING');
+
+            console.log('[completeConsultationByTokenNumber] TRANSACTION: Serving token:', servingToken?.tokenNumber || null);
+            console.log('[completeConsultationByTokenNumber] TRANSACTION: Waiting count:', waitingTokens.length);
 
             return {
                 updated,
@@ -506,6 +562,15 @@ export const completeConsultationByTokenNumber = async (req, res) => {
 
         console.log(`[completeConsultationByTokenNumber] SUCCESS - Returning complete queue state`);
         
+        const waitingTokens = result.waitingTokens;
+        const estimatedTime = `${waitingTokens.length * 5} mins`;
+        
+        console.log('[completeConsultationByTokenNumber] Building response:', {
+          currentToken: result.servingToken?.tokenNumber || null,
+          waiting: waitingTokens.length,
+          estimatedTime: estimatedTime
+        });
+        
         return res.status(200).json({
             success: true,
             message: `Token #${tokenNumber} marked as complete.`,
@@ -513,9 +578,14 @@ export const completeConsultationByTokenNumber = async (req, res) => {
                 tokenUpdated: tokenNumber,
                 completedStatus: 'COMPLETED',
                 queueUpdated: true,
+                // Standardized field names for frontend
+                currentToken: result.servingToken?.tokenNumber || null,
                 currentServing: result.servingToken?.tokenNumber || null,
-                waitingCount: result.waitingTokens.length,
+                waiting: waitingTokens.length,
+                waitingCount: waitingTokens.length,
+                estimatedTime: estimatedTime,
                 patients: result.allTokens.map(t => ({
+                    id: t.patient.id,
                     tokenNumber: t.tokenNumber,
                     name: t.patient.name,
                     status: t.status,
@@ -527,7 +597,10 @@ export const completeConsultationByTokenNumber = async (req, res) => {
         });
 
     } catch (error) {
-        console.error(`[completeConsultationByTokenNumber] FATAL ERROR for token ${tokenNumber}:`, error.message);
+        console.error(`[completeConsultationByTokenNumber] ============ FATAL ERROR ============`);
+        console.error(`[completeConsultationByTokenNumber] Token: ${tokenNumber}`);
+        console.error(`[completeConsultationByTokenNumber] Error message:`, error.message);
+        console.error(`[completeConsultationByTokenNumber] Error stack:`, error.stack);
         return res.status(500).json({ success: false, message: "Internal Server Error.", error: error.message });
     }
 };

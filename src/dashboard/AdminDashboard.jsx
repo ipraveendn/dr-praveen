@@ -27,8 +27,8 @@ export default function AdminDashboard() {
     const cacheKey = `queue_${clinicId}`
     const now = Date.now()
     
-    // Debounce: don't refresh if we just refreshed (within 500ms)
-    if (!forceRefresh && lastRefreshTime.current[cacheKey] && now - lastRefreshTime.current[cacheKey] < 500) {
+    // Debounce: don't refresh if we just refreshed (within 200ms)
+    if (!forceRefresh && lastRefreshTime.current[cacheKey] && now - lastRefreshTime.current[cacheKey] < 200) {
       console.log('[AdminDashboard] Skipping refresh - cache fresh')
       return
     }
@@ -104,19 +104,35 @@ export default function AdminDashboard() {
 
   async function callNext() {
     if (waiting.length === 0 || actionLoading) {
+      console.log('[AdminDashboard] callNext -> Conditions not met. Waiting:', waiting.length, 'Loading:', actionLoading)
       return
     }
+    
+    console.log('[AdminDashboard] ============ CALL NEXT STARTED ============')
+    console.log('[AdminDashboard] callNext -> clinic:', clinicId)
+    console.log('[AdminDashboard] callNext -> waiting count:', waiting.length)
+    console.log('[AdminDashboard] callNext -> token in localStorage:', !!localStorage.getItem('token'))
     
     setActionLoading(true)
     
     // OPTIMISTIC UPDATE
     const nextPatient = waiting[0]
     const currentServing = serving
+    console.log('[AdminDashboard] callNext -> OPTIMISTIC UPDATE')
+    console.log('[AdminDashboard] callNext -> next patient:', nextPatient.tokenNumber)
+    console.log('[AdminDashboard] callNext -> current serving:', currentServing?.tokenNumber)
+    
     const optimisticData = {
       ...queueData,
       patients: queueData.patients.map(p => {
-        if (p.tokenNumber === currentServing?.tokenNumber) return { ...p, status: 'COMPLETED' }
-        if (p.tokenNumber === nextPatient.tokenNumber) return { ...p, status: 'SERVING' }
+        if (p.tokenNumber === currentServing?.tokenNumber) {
+          console.log(`[AdminDashboard] Token #${p.tokenNumber}: SERVING -> COMPLETED (optimistic)`)
+          return { ...p, status: 'COMPLETED' }
+        }
+        if (p.tokenNumber === nextPatient.tokenNumber) {
+          console.log(`[AdminDashboard] Token #${p.tokenNumber}: WAITING -> SERVING (optimistic)`)
+          return { ...p, status: 'SERVING' }
+        }
         return p
       }),
       currentToken: nextPatient.tokenNumber
@@ -124,22 +140,46 @@ export default function AdminDashboard() {
     setQueueData(optimisticData)
     
     try {
+      console.log('[AdminDashboard] callNext -> API CALL STARTING')
+      console.log('[AdminDashboard] callNext -> endpoint: /queue/next')
+      console.log('[AdminDashboard] callNext -> payload:', { clinic: clinicId })
+      
       const response = await apiRequest('/queue/next', { 
         method: 'POST', 
         body: JSON.stringify({ clinic: clinicId }) 
       })
       
+      console.log('[AdminDashboard] callNext -> API SUCCESS')
+      console.log('[AdminDashboard] callNext -> response:', response)
+      
       // Update state with server response
       if (response?.data?.patients && Array.isArray(response.data.patients)) {
-        setQueueData({
+        console.log('[AdminDashboard] callNext -> updating state from server response')
+        const newData = {
           currentToken: response.data.nextServing || null,
           waiting: response.data.patients.filter(p => p.status === 'WAITING').length,
           estimatedTime: response.data.estimatedTime || '0 mins',
           patients: response.data.patients
-        })
+        }
+        console.log('[AdminDashboard] callNext -> new state:', newData)
+        setQueueData(newData)
+        console.log('[AdminDashboard] ============ CALL NEXT SUCCESS ============')
+      } else {
+        console.log('[AdminDashboard] callNext -> response missing patients array, refreshing')
+        await refreshQueue(true)
       }
     } catch (error) {
-      console.error('[AdminDashboard] Call next failed:', error)
+      console.error('[AdminDashboard] ============ CALL NEXT FAILED ============')
+      console.error('[AdminDashboard] callNext error:', error)
+      console.error('[AdminDashboard] callNext error status:', error?.status)
+      console.error('[AdminDashboard] callNext error data:', error?.data)
+      console.error('[AdminDashboard] callNext error message:', error?.message)
+      
+      if (error?.status === 401) {
+        console.error('[CRITICAL] Authentication failed - token invalid or expired')
+      }
+      
+      console.log('[AdminDashboard] callNext -> forcing refresh due to error')
       await refreshQueue(true)
     } finally {
       setActionLoading(false)
@@ -148,13 +188,21 @@ export default function AdminDashboard() {
 
   async function markDone() {
     if (!serving?.tokenNumber || completeLoading) {
+      console.log('[AdminDashboard] markDone -> Conditions not met. Serving:', serving?.tokenNumber, 'Loading:', completeLoading)
       return
     }
+    
+    console.log('[AdminDashboard] ============ MARK DONE STARTED ============')
+    console.log('[AdminDashboard] markDone -> serving token:', serving.tokenNumber)
+    console.log('[AdminDashboard] markDone -> clinic:', clinicId)
+    console.log('[AdminDashboard] markDone -> token in localStorage:', !!localStorage.getItem('token'))
     
     setCompleteLoading(true)
     const servingTokenNumber = serving.tokenNumber
     
     // OPTIMISTIC UPDATE
+    console.log('[AdminDashboard] markDone -> OPTIMISTIC UPDATE')
+    console.log(`[AdminDashboard] Token #${servingTokenNumber}: SERVING -> COMPLETED (optimistic)`)
     const optimisticData = {
       ...queueData,
       patients: queueData.patients.map(p => 
@@ -165,23 +213,48 @@ export default function AdminDashboard() {
     setQueueData(optimisticData)
     
     try {
+      console.log('[AdminDashboard] markDone -> API CALL STARTING')
+      console.log('[AdminDashboard] markDone -> endpoint: /queue/complete/' + servingTokenNumber)
+      console.log('[AdminDashboard] markDone -> payload:', { clinic: clinicId })
+      
       const response = await apiRequest(`/queue/complete/${servingTokenNumber}`, {
         method: 'PATCH',
         body: JSON.stringify({ clinic: clinicId })
       })
       
+      console.log('[AdminDashboard] markDone -> API SUCCESS')
+      console.log('[AdminDashboard] markDone -> response:', response)
+      
       // Update state with server response (confirms database persistence)
       if (response?.data?.patients && Array.isArray(response.data.patients)) {
-        setQueueData({
+        console.log('[AdminDashboard] markDone -> updating state from server response')
+        const newData = {
           currentToken: response.data.currentServing || null,
           waiting: response.data.waitingCount || 0,
           estimatedTime: response.data.estimatedTime || '0 mins',
           patients: response.data.patients
-        })
+        }
+        console.log('[AdminDashboard] markDone -> new state:', newData)
+        setQueueData(newData)
+        console.log('[AdminDashboard] ============ MARK DONE SUCCESS ============')
+      } else {
+        console.log('[AdminDashboard] markDone -> response missing patients array, refreshing')
+        await refreshQueue(true)
       }
     } catch (error) {
-      console.error('[AdminDashboard] Mark done failed:', error)
-      // On error, refresh to get actual state
+      console.error('[AdminDashboard] ============ MARK DONE FAILED ============')
+      console.error('[AdminDashboard] Mark done failed with error:', error);
+      console.error('[AdminDashboard] Error status:', error?.status);
+      console.error('[AdminDashboard] Error data:', error?.data);
+      console.error('[AdminDashboard] Error message:', error?.message);
+      
+      // Check if it's a 401 (not authenticated)
+      if (error?.status === 401) {
+        console.error('[CRITICAL AUTH ERROR] Not authenticated - token may be invalid or expired');
+      }
+      
+      // REVERT optimistic update on error - refresh to get actual state
+      console.log('[AdminDashboard] markDone -> forcing refresh due to error')
       await refreshQueue(true)
     } finally {
       setCompleteLoading(false)
