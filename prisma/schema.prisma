@@ -26,9 +26,11 @@ enum Role {
 // Clinic model
 model Clinic {
   id      String  @id @default(uuid())
-  name    String
+  name    String  @unique
   address String
   tokens  Token[]
+
+  @@index([name])
 }
 
 // Patient model
@@ -39,6 +41,8 @@ model Patient {
   email  String?
   place  String?
   tokens Token[]
+
+  @@index([phone])
 }
 
 // Token model
