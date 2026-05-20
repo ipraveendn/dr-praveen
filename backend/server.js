@@ -1,6 +1,8 @@
 
 import express from 'express'
 import cors from 'cors'
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
 import dotenv from 'dotenv'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -60,6 +62,74 @@ const safeStringify = (value) => {
 // ============================================
 // MIDDLEWARE
 // ============================================
+
+// ============================================
+// SECURITY: Helmet - HTTP security headers
+// ============================================
+// Helps protect against vulnerabilities like XSS, clickjacking, etc.
+app.use(helmet({
+  // Customize helmet options for compatibility
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://dr-praveen.onrender.com", "https://api.twilio.com", "https://api.supabase.co"],
+    }
+  },
+  crossOriginResourcePolicy: false, // Allow CORS resources
+  hsts: {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true
+  }
+}))
+
+// ============================================
+// SECURITY: Rate Limiting
+// ============================================
+
+// Global rate limiter (moderate - allows normal dashboard usage)
+const globalLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute window
+  max: 100, // 100 requests per minute (plenty for normal usage)
+  message: { success: false, message: "Too many requests, please try again later" },
+  standardHeaders: true, // Return rate limit info in RateLimit-* headers
+  skip: (req) => req.path === '/api/health' || req.path === '/api', // Don't count health checks
+})
+
+// Auth/sensitive endpoints - stricter rate limit
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minute window
+  max: 5, // 5 login attempts per 15 minutes
+  message: { success: false, message: "Too many login attempts, please try again later" },
+  skipSuccessfulRequests: true, // Don't count successful requests
+  standardHeaders: true
+})
+
+// Queue operations - moderate rate limit
+const queueLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute window
+  max: 30, // 30 queue operations per minute (reasonable for normal usage)
+  message: { success: false, message: "Too many queue operations, please slow down" },
+  standardHeaders: true,
+  skip: (req) => {
+    // Don't rate limit GET requests (fetching data)
+    return req.method === 'GET'
+  }
+})
+
+// Payment operations - stricter to prevent fraud
+const paymentLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute window
+  max: 10, // 10 payment attempts per minute
+  message: { success: false, message: "Too many payment requests, please try again later" },
+  standardHeaders: true
+})
+
+// Apply global limiter
+app.use(globalLimiter)
 
 const allowedOrigins = [
   "http://localhost:3000",
@@ -128,9 +198,9 @@ app.get('/', (req, res) => {
 // ============================================
 // API ROUTES
 // ============================================
-app.use('/api/auth', authRoutes)
-app.use('/api/queue', queueRoutes)
-app.use('/api/payment', paymentRoutes)
+app.use('/api/auth', authLimiter, authRoutes)
+app.use('/api/queue', queueLimiter, queueRoutes)
+app.use('/api/payment', paymentLimiter, paymentRoutes)
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
