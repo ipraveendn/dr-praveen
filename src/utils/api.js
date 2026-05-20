@@ -69,12 +69,12 @@ export async function apiFetch(url, options = {}) {
     const cached = requestCache.get(cacheKey)
     if (cached && isCacheValid(cached)) {
       console.log(`[apiFetch] Cache HIT for ${cacheKey}`)
-      // Create a fake response from cache
+      // Create a fake response from cache - return clone for each caller
       const response = new Response(JSON.stringify(cached.data), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       })
-      return response
+      return response.clone()
     } else if (cached) {
       console.log(`[apiFetch] Cache EXPIRED for ${cacheKey}`)
       requestCache.delete(cacheKey)
@@ -122,12 +122,15 @@ export async function apiFetch(url, options = {}) {
             timestamp: Date.now()
           })
           console.log(`[apiFetch] Cached GET response for ${cacheKey}`)
+          // Return a clone so each caller gets their own readable stream
+          return response.clone()
         } catch (e) {
           console.log(`[apiFetch] Could not cache response for ${cacheKey}:`, e)
         }
       }
       
-      return response;
+      // Always return a clone to prevent stream consumption issues with deduplication
+      return response.clone();
     } catch (error) {
       clearTimeout(timeoutId);
       console.error(`[API FETCH ERROR] ${fullUrl}:`, error);
