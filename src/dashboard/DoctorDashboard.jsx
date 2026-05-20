@@ -15,6 +15,7 @@ export default function DoctorDashboard() {
   const [queueLoading, setQueueLoading] = useState(true)
   const [completeLoading, setCompleteLoading] = useState(false)
   const today = new Date().toDateString()
+  const lastMutationTime = useRef(null) // Track last mutation time to prevent polling interference
 
   const normalizeQueuePayload = (payload) => {
     if (!payload) return null
@@ -34,6 +35,12 @@ export default function DoctorDashboard() {
     let intervalId = null
 
     const fetchQueue = async () => {
+      // Skip polling for 3 seconds after a mutation to prevent interference
+      if (lastMutationTime.current && Date.now() - lastMutationTime.current < 3000) {
+        console.log('[DoctorDashboard] Skipping poll - recent mutation in progress')
+        return
+      }
+      
       try {
         console.log('[DoctorDashboard] Polling queue for clinic:', clinic)
         const json = await apiRequest(`/queue?clinic=${clinic}`)
@@ -73,6 +80,10 @@ export default function DoctorDashboard() {
     console.log('[DoctorDashboard] markDone -> token in localStorage:', !!localStorage.getItem('token'))
     
     setCompleteLoading(true)
+    
+    // Store current queue data before update
+    const previousQueueData = queueData
+    
     try {
       const endpoint = `/queue/complete/${tokenNumber}`
       const payload = { clinic }
@@ -80,6 +91,10 @@ export default function DoctorDashboard() {
       console.log('[DoctorDashboard] markDone -> API CALL STARTING')
       console.log('[DoctorDashboard] markDone -> endpoint:', endpoint)
       console.log('[DoctorDashboard] markDone -> payload:', payload)
+      
+      // Mark mutation time to prevent polling interference
+      lastMutationTime.current = Date.now()
+      console.log('[DoctorDashboard] markDone -> mutation timestamp set, polling disabled for 3s')
       
       const json = await apiRequest(endpoint, { 
         method: 'PATCH', 
@@ -97,7 +112,7 @@ export default function DoctorDashboard() {
       console.log('[DoctorDashboard] markDone -> payload.patients length:', payload_response?.patients?.length)
       
       if (payload_response && Array.isArray(payload_response.patients)) {
-        console.log('[DoctorDashboard] markDone -> normalizing patients')
+        console.log('[DoctorDashboard] markDone -> processing patients from response')
         const normalized = payload_response.patients.map((p) => {
           const s = String(p.status || '').toUpperCase()
           console.log(`[DoctorDashboard] Token #${p.tokenNumber}: status = ${s}`)
@@ -105,16 +120,22 @@ export default function DoctorDashboard() {
         })
 
         const newData = {
-          currentToken: payload_response.currentToken ?? null,
-          waiting: payload_response.waiting ?? 0,
-          estimatedTime: payload_response.estimatedTime ?? '0 mins',
+          currentToken: payload_response.currentToken || payload_response.currentServing || null,
+          waiting: payload_response.waiting || payload_response.waitingCount || 0,
+          estimatedTime: payload_response.estimatedTime || '0 mins',
           patients: normalized,
         }
         console.log('[DoctorDashboard] markDone -> setting queue data:', newData)
+        
+        // Check if there's a new SERVING patient
+        const newServing = normalized.find(p => p.status === 'SERVING')
+        console.log('[DoctorDashboard] markDone -> new serving patient:', newServing?.tokenNumber || 'none')
+        
         setQueueData(newData)
         console.log('[DoctorDashboard] ============ MARK DONE SUCCESS ============')
       } else {
         console.log('[DoctorDashboard] markDone -> payload is invalid, forcing refresh')
+        // Fallback: force a refresh if backend returned only a partial response
         const refresh = await apiRequest(`/queue?clinic=${clinic}`)
         console.log('[DoctorDashboard] markDone -> refresh response:', refresh?.data)
         setQueueData(normalizeQueuePayload(refresh?.data ?? null))
@@ -130,8 +151,13 @@ export default function DoctorDashboard() {
         console.error('[CRITICAL] Authentication failed - token invalid or expired')
       }
       
+      // Revert to previous data and force refresh
+      console.log('[DoctorDashboard] markDone -> reverting state and refreshing')
+      setQueueData(previousQueueData)
+      
       try {
         const refresh = await apiRequest(`/queue?clinic=${clinic}`)
+        console.log('[DoctorDashboard] markDone -> refresh response after error:', refresh?.data)
         setQueueData(normalizeQueuePayload(refresh?.data ?? null))
       } catch (refreshError) {
         console.error('[DoctorDashboard] markDone refresh fallback failed:', refreshError)

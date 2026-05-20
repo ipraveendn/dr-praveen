@@ -22,10 +22,17 @@ export default function AdminDashboard() {
   // Track pending requests to avoid duplicates
   const pendingRequests = useRef({})
   const lastRefreshTime = useRef({})
+  const lastMutationTime = useRef(null) // Track last mutation to prevent auto-refresh interference
 
   const refreshQueue = useCallback(async (forceRefresh = false) => {
     const cacheKey = `queue_${clinicId}`
     const now = Date.now()
+    
+    // Skip refresh if mutation in progress (within 3 seconds)
+    if (lastMutationTime.current && now - lastMutationTime.current < 3000 && !forceRefresh) {
+      console.log('[AdminDashboard] Skipping refresh - recent mutation in progress')
+      return
+    }
     
     // Debounce: don't refresh if we just refreshed (within 200ms)
     if (!forceRefresh && lastRefreshTime.current[cacheKey] && now - lastRefreshTime.current[cacheKey] < 200) {
@@ -115,6 +122,10 @@ export default function AdminDashboard() {
     
     setActionLoading(true)
     
+    // Mark mutation time to prevent auto-refresh interference
+    lastMutationTime.current = Date.now()
+    console.log('[AdminDashboard] callNext -> mutation timestamp set, auto-refresh disabled for 3s')
+    
     // OPTIMISTIC UPDATE
     const nextPatient = waiting[0]
     const currentServing = serving
@@ -200,6 +211,10 @@ export default function AdminDashboard() {
     setCompleteLoading(true)
     const servingTokenNumber = serving.tokenNumber
     
+    // Mark mutation time to prevent auto-refresh interference
+    lastMutationTime.current = Date.now()
+    console.log('[AdminDashboard] markDone -> mutation timestamp set, auto-refresh disabled for 3s')
+    
     // OPTIMISTIC UPDATE
     console.log('[AdminDashboard] markDone -> OPTIMISTIC UPDATE')
     console.log(`[AdminDashboard] Token #${servingTokenNumber}: SERVING -> COMPLETED (optimistic)`)
@@ -229,8 +244,8 @@ export default function AdminDashboard() {
       if (response?.data?.patients && Array.isArray(response.data.patients)) {
         console.log('[AdminDashboard] markDone -> updating state from server response')
         const newData = {
-          currentToken: response.data.currentServing || null,
-          waiting: response.data.waitingCount || 0,
+          currentToken: response.data.currentToken || response.data.currentServing || null,
+          waiting: response.data.waiting || response.data.waitingCount || 0,
           estimatedTime: response.data.estimatedTime || '0 mins',
           patients: response.data.patients
         }
