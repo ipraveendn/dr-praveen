@@ -5,7 +5,7 @@
  * Includes dynamic metadata generation, OpenGraph, Twitter cards, structured data.
  */
 
-const SITE_URL = import.meta.env.PROD 
+export const SITE_URL = import.meta.env.PROD 
   ? 'https://drpraveenramachandra.com'
   : 'http://localhost:5173'
 

@@ -20,11 +20,29 @@ export default function ChatBot({ open, setOpen }) {
   function getReply(msg) {
     const m = msg.toLowerCase()
 
-    if (m.includes('time')) return CHATBOT_RESPONSES.timings
-    if (m.includes('book')) return CHATBOT_RESPONSES.book
-    if (m.includes('service') || m.includes('diabetes') || m.includes('thyroid')) return CHATBOT_RESPONSES.services
-    if (m.includes('location') || m.includes('address')) return CHATBOT_RESPONSES.location
-    if (m.includes('fee') || m.includes('cost')) return CHATBOT_RESPONSES.fee
+    // Timings
+    if (m.includes('time') || m.includes('timing') || m.includes('hours') || m.includes('open')) 
+      return CHATBOT_RESPONSES.timings
+    
+    // Booking
+    if (m.includes('book') || m.includes('appointment') || m.includes('token') || m.includes('slot')) 
+      return CHATBOT_RESPONSES.book
+    
+    // Services
+    if (m.includes('service') || m.includes('diabetes') || m.includes('thyroid') || m.includes('treatment') || m.includes('condition') || m.includes('pcos') || m.includes('obesity') || m.includes('hormone')) 
+      return CHATBOT_RESPONSES.services
+    
+    // Location
+    if (m.includes('location') || m.includes('address') || m.includes('where') || m.includes('clinic') || m.includes('direction')) 
+      return CHATBOT_RESPONSES.location
+    
+    // Fee/Cost
+    if (m.includes('fee') || m.includes('cost') || m.includes('price') || m.includes('charge') || m.includes('payment')) 
+      return CHATBOT_RESPONSES.fee
+    
+    // Doctor
+    if (m.includes('doctor') || m.includes('praveen') || m.includes('about') || m.includes('experience') || m.includes('qualification')) 
+      return CHATBOT_RESPONSES.doctor
 
     return CHATBOT_RESPONSES.default
   }

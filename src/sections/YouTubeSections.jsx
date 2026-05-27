@@ -25,7 +25,7 @@ export default function YouTubeSection() {
 
         {/* BUTTON */}
         <a
-          href="https://youtube.com/@diaplusclinicbengaluru"
+          href="https://youtube.com/@praveenramachandra9265?si=KiWVecHlYbutSx04"
           target="_blank"
           rel="noreferrer"
           style={{

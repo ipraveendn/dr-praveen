@@ -27,6 +27,10 @@ import { logConnectionDiagnostics } from './utils/connectionChecker'
 
 function CustomCursor() {
   useEffect(() => {
+    // Only enable custom cursor on desktop (viewport width > 768px)
+    const isMobile = window.innerWidth <= 768
+    if (isMobile) return
+
     const cur = document.getElementById('cursor')
     const ring = document.getElementById('cursor-ring')
     if (!cur || !ring) return
