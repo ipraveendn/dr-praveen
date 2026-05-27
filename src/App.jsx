@@ -13,6 +13,8 @@ import Home from './pages/Home'
 import About from './pages/About'
 import Services from './pages/Services'
 import Clinics from './pages/Clinics'
+import Pharmacy from './pages/Pharmacy'
+import Laboratory from './pages/Laboratory'
 import Queue from './pages/Queue'
 import Track from './pages/Track'
 import Blog from './pages/Blog'
@@ -117,6 +119,8 @@ export default function App() {
           <Route path="/about" element={<About />} />
           <Route path="/services" element={<Services />} />
           <Route path="/clinics" element={<Clinics />} />
+          <Route path="/pharmacy" element={<Pharmacy />} />
+          <Route path="/laboratory" element={<Laboratory />} />
           <Route path="/queue" element={<Queue />} />
           <Route path="/track" element={<Track />} />
           <Route path="/track/:id" element={<Track />} />
