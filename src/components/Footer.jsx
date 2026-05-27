@@ -198,7 +198,7 @@ export default function Footer() {
           </span>
 
           <span style={{ fontSize: '12px', color: '#0FA898', fontWeight: '600' }}>
-            Designed & Built by Pranathi R N
+            Designed & Built by Pranathi R N & Praveen D N
           </span>
         </div>
       </div>
