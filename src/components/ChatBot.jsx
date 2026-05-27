@@ -90,7 +90,7 @@ export default function ChatBot({ open, setOpen }) {
       borderRadius: '20px',
       boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
       overflow: 'hidden',
-      zIndex: 998
+      zIndex: 500
     }}>
 
       {/* HEADER */}

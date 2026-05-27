@@ -10,7 +10,7 @@ export default function FloatingActions({ onChatOpen }) {
       position: 'fixed',
       bottom: '28px',
       right: '28px',
-      zIndex: 999
+      zIndex: 500
     }}>
 
       {/* OPTIONS */}
