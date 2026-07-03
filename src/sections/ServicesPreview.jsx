@@ -68,32 +68,35 @@ export default function ServicesPreview() {
           {filtered.map((s) => {
             const Icon = s.icon
             return (
-              <div key={s.name} style={{
-                border: '1px solid #E2EEEC',
-                borderRadius: '16px',
-                padding: '20px',
-                background: '#F8FAFA',
-                transition: '0.2s',
-              }}>
+              <Link key={s.name} to={`/queue?service=${encodeURIComponent(s.name)}`} style={{ textDecoration: 'none' }}>
                 <div style={{
-                  width: '44px',
-                  height: '44px',
-                  background: '#E6F4F2',
-                  borderRadius: '12px',
-                  marginBottom: '12px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
+                  border: '1px solid #E2EEEC',
+                  borderRadius: '16px',
+                  padding: '20px',
+                  background: '#F8FAFA',
+                  transition: '0.2s',
+                  color: 'inherit'
                 }}>
-                  <Icon size={20} color="#0B7B6F" />
+                  <div style={{
+                    width: '44px',
+                    height: '44px',
+                    background: '#E6F4F2',
+                    borderRadius: '12px',
+                    marginBottom: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <Icon size={20} color="#0B7B6F" />
+                  </div>
+                  <div style={{ fontWeight: '700', fontSize: '14px', color: '#0A1628', marginBottom: '4px' }}>
+                    {s.name}
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#64748B', lineHeight: '1.5' }}>
+                    {s.desc}
+                  </div>
                 </div>
-                <div style={{ fontWeight: '700', fontSize: '14px', color: '#0A1628', marginBottom: '4px' }}>
-                  {s.name}
-                </div>
-                <div style={{ fontSize: '13px', color: '#64748B', lineHeight: '1.5' }}>
-                  {s.desc}
-                </div>
-              </div>
+              </Link>
             )
           })}
         </div>

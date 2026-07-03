@@ -59,6 +59,7 @@ model Token {
   id            String      @id @default(uuid())
   tokenNumber   Int
   status        TokenStatus @default(WAITING)
+  consultationMode String?
 
   patientId     String
   patient       Patient @relation(fields: [patientId], references: [id])

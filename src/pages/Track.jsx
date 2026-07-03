@@ -167,6 +167,7 @@ export default function Track() {
                   <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '4px' }}>Patient</div>
                   <div style={{ fontWeight: '700', color: '#0A1628' }}>{data.patient || data.name}</div>
                   <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>{data.reason}</div>
+                  <div style={{ fontSize: '12px', color: '#0B7B6F', fontWeight: '700', marginTop: '4px' }}>{data.consultationMode || 'N/A'}</div>
                 </div>
 
                 {/* Auto-refresh toggle */}

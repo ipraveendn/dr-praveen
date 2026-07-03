@@ -159,7 +159,7 @@ export default function Services() {
                     </div>
 
                     {/* CTA */}
-                    <Link to="/queue" style={{
+                    <Link to={`/queue?service=${encodeURIComponent(s.name)}`} style={{
                       fontSize: '12.5px',
                       color: '#0B7B6F',
                       fontWeight: '700',

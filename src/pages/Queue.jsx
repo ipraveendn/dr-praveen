@@ -31,7 +31,10 @@ function LiveQueue({ data }) {
           <div key={index} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #E2EEEC', fontSize: '14px' }}>
             <span style={{ color: '#0A1628', fontWeight: '700' }}>#{String(patient.tokenNumber).padStart(2, '0')}</span>
             <span style={{ color: '#64748B', fontWeight: '500' }}>{patient.name}</span>
-            <span style={{ color: '#0B7B6F', fontWeight: '600' }}>{patient.clinic}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+              <span style={{ color: '#0B7B6F', fontWeight: '600' }}>{patient.clinic}</span>
+              <span style={{ color: '#64748B', fontSize: '11px', fontWeight: '500' }}>{patient.consultationMode || 'N/A'}</span>
+            </div>
           </div>
         ))}
       </div>
@@ -43,6 +46,7 @@ export default function Queue() {
   const [step, setStep]     = useState(1)
   const [clinic, setClinic] = useState('')
   const [form, setForm]     = useState({ name: '', phone: '', email: '', place: '', doctor: 'Dr. Praveen Ramachandra', reason: '' })
+  const [consultationMode, setConsultationMode] = useState('') // 'IN_PERSON' or 'ONLINE'
   const [token, setToken]   = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError]   = useState('')
@@ -67,6 +71,17 @@ export default function Queue() {
     return () => clearInterval(interval);
   }, []);
 
+  // Prefill reason from query param (service) if provided
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const svc = params.get('service')
+      if (svc) setForm(f => ({ ...f, reason: svc }))
+    } catch (e) {
+      // ignore
+    }
+  }, [])
+
   /**
    * Create payment order before showing payment screen
    */
@@ -78,7 +93,7 @@ export default function Queue() {
     try {
       const orderData = await createPaymentOrder(500) // ₹500 consultation fee
       setPaymentOrder(orderData)
-      setStep(4) // Go to payment screen
+      setStep(5) // Go to payment screen (moved one step due to consultation mode)
     } catch (e) {
       console.error('[CREATE ORDER ERROR]', e)
       setError(e.message || 'Failed to create order. Please try again.')
@@ -162,6 +177,7 @@ export default function Queue() {
         place: form.place,
         reason: form.reason,
         clinic: clinic,
+        consultationMode: consultationMode,
         trackingUrl: `${window.location.origin}/track?phone=${form.phone}`
       }
       console.log('[TOKEN FLOW] Step 2: Request body prepared:', requestBody)
@@ -197,8 +213,8 @@ export default function Queue() {
       console.log('[TOKEN FLOW] Step 7: Setting token state to:', tokenNum)
       setToken(tokenNum)
       
-      console.log('[TOKEN FLOW] Step 8: Moving to step 5 (success screen)')
-      setStep(5) // Final success screen
+      console.log('[TOKEN FLOW] Step 8: Moving to step 6 (success screen)')
+      setStep(6) // Final success screen
       
       console.log('[TOKEN FLOW] ===== TOKEN GENERATION COMPLETE =====\n')
     } catch (e) {
@@ -231,13 +247,13 @@ export default function Queue() {
         </div>
 
         {/* Progress */}
-        {step < 5 && (
+        {step < 6 && (
           <div style={{ background: '#fff', borderBottom: '1px solid #E2EEEC', padding: '16px 5%', display: 'flex', justifyContent: 'center', gap: '8px', alignItems: 'center' }}>
-            {['Choose Clinic','Your Details','Confirm','Payment'].map((s, i) => (
+            {['Choose Clinic','Consultation Mode','Your Details','Confirm','Payment'].map((s, i) => (
               <div key={s} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: step > i + 1 ? '#0B7B6F' : step === i + 1 ? '#0B7B6F' : '#E2EEEC', color: step >= i + 1 ? '#fff' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700' }}>{step > i + 1 ? '✓' : i + 1}</div>
                 <span style={{ fontSize: '13px', fontWeight: step === i + 1 ? '700' : '400', color: step === i + 1 ? '#0A1628' : '#64748B' }}>{s}</span>
-                {i < 3 && <span style={{ color: '#E2EEEC', fontSize: '16px' }}>›</span>}
+                {i < 4 && <span style={{ color: '#E2EEEC', fontSize: '16px' }}>›</span>}
               </div>
             ))}
           </div>
@@ -267,8 +283,28 @@ export default function Queue() {
               </div>
             )}
 
-            {/* Step 2 — Details */}
+            {/* Step 2 — Consultation Mode */}
             {step === 2 && (
+              <div>
+                <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>Consultation Mode</h2>
+                <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '28px' }}>Choose how you'd like to consult</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div onClick={() => { setConsultationMode('IN_PERSON'); setStep(3); }}
+                    style={{ border: `2px solid ${consultationMode === 'IN_PERSON' ? '#0B7B6F' : '#E2EEEC'}`, borderRadius: '14px', padding: '20px', cursor: 'pointer', transition: 'all 0.2s', background: consultationMode === 'IN_PERSON' ? '#E6F4F2' : '#fff' }}>
+                    <div style={{ fontWeight: '700', color: '#0A1628', marginBottom: '4px' }}>In-Person Consultation</div>
+                    <div style={{ fontSize: '12px', color: '#64748B' }}>Visit the clinic for face-to-face consultation</div>
+                  </div>
+                  <div onClick={() => { setConsultationMode('ONLINE'); setStep(3); }}
+                    style={{ border: `2px solid ${consultationMode === 'ONLINE' ? '#0B7B6F' : '#E2EEEC'}`, borderRadius: '14px', padding: '20px', cursor: 'pointer', transition: 'all 0.2s', background: consultationMode === 'ONLINE' ? '#E6F4F2' : '#fff' }}>
+                    <div style={{ fontWeight: '700', color: '#0A1628', marginBottom: '4px' }}>Online Consultation</div>
+                    <div style={{ fontSize: '12px', color: '#64748B' }}>Consult via video/phone</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3 — Details */}
+            {step === 3 && (
               <div>
                 <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>Your Details</h2>
                 <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '28px' }}>Clinic: <strong style={{ color: '#0B7B6F' }}>{clinicObj?.name}</strong></p>
@@ -302,13 +338,13 @@ export default function Queue() {
                 {error && <p style={{ color: '#ef4444', fontSize: '13px', marginBottom: '16px' }}>⚠️ {error}</p>}
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button onClick={() => setStep(1)} className="btn-secondary" style={{ flex: 1 }}>← Back</button>
-                  <button onClick={() => { if (!form.name || !form.phone || !form.reason) { setError('Please fill all fields'); return; } setError(''); setStep(3); }} className="btn-primary" style={{ flex: 2 }}>Continue →</button>
+                  <button onClick={() => { if (!form.name || !form.phone || !form.reason) { setError('Please fill all fields'); return; } setError(''); setStep(4); }} className="btn-primary" style={{ flex: 2 }}>Continue →</button>
                 </div>
               </div>
             )}
 
-            {/* Step 3 — Confirm */}
-            {step === 3 && (
+            {/* Step 4 — Confirm */}
+            {step === 4 && (
               <div>
                 <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628', marginBottom: '24px' }}>Confirm Details</h2>
                 {[
@@ -328,7 +364,7 @@ export default function Queue() {
                 <p style={{ color: '#64748B', fontSize: '13px', margin: '20px 0', lineHeight: '1.6' }}> You will receive an SMS with your token number and a live tracking link on <strong>{form.phone}</strong></p>
                 {error && <p style={{ color: '#ef4444', fontSize: '13px', marginBottom: '12px' }}>⚠️ {error}</p>}
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  <button onClick={() => setStep(2)} className="btn-secondary" style={{ flex: 1 }}>← Edit</button>
+                  <button onClick={() => setStep(3)} className="btn-secondary" style={{ flex: 1 }}>← Edit</button>
                   <button onClick={createOrder} disabled={loading} className="btn-primary" style={{ flex: 2, opacity: loading ? 0.7 : 1 }}>
                     {loading ? '⏳ Processing...' : ' Proceed to Payment'}
                   </button>
@@ -336,8 +372,8 @@ export default function Queue() {
               </div>
             )}
 
-            {/* Step 4 — Payment */}
-            {step === 4 && paymentOrder && !token && (
+            {/* Step 5 — Payment */}
+            {step === 5 && paymentOrder && !token && (
               <div style={{ textAlign: 'center' }}>
                 <div style={{ marginBottom: '24px' }}>
                   <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '26px', fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>Confirm Payment</h2>
@@ -388,7 +424,7 @@ export default function Queue() {
                 {/* Action Buttons */}
                 {!paymentStatus && (
                   <div style={{ display: 'flex', gap: '10px' }}>
-                    <button onClick={() => { setStep(3); setPaymentOrder(null); }} className="btn-secondary" style={{ flex: 1 }}>← Cancel</button>
+                    <button onClick={() => { setStep(4); setPaymentOrder(null); }} className="btn-secondary" style={{ flex: 1 }}>← Cancel</button>
                     <button onClick={processPayment} disabled={loading} className="btn-primary" style={{ flex: 2, opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}>
                       {loading ? ' Processing...' : ' Pay Now'}
                     </button>
@@ -397,7 +433,7 @@ export default function Queue() {
 
                 {paymentStatus === 'failed' && (
                   <div style={{ display: 'flex', gap: '10px' }}>
-                    <button onClick={() => { setStep(3); setPaymentOrder(null); setPaymentStatus(null); }} className="btn-secondary" style={{ flex: 1 }}>← Back</button>
+                    <button onClick={() => { setStep(4); setPaymentOrder(null); setPaymentStatus(null); }} className="btn-secondary" style={{ flex: 1 }}>← Back</button>
                     <button onClick={retryPayment} className="btn-primary" style={{ flex: 2 }}>Retry Payment</button>
                   </div>
                 )}
@@ -417,8 +453,8 @@ export default function Queue() {
               </div>
             )}
 
-            {/* Step 5 — Success */}
-            {step === 5 && token && (
+            {/* Step 6 — Success */}
+            {step === 6 && token && (
               <div style={{ textAlign: 'center' }}>
                 <div style={{ background: 'linear-gradient(135deg,#0B7B6F,#096358)', borderRadius: '20px', padding: '32px', marginBottom: '24px' }}>
                   <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '8px' }}>Your Queue Token</div>
@@ -430,7 +466,7 @@ export default function Queue() {
                   <p style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>Your token number and live tracking link have been sent.</p>
                 </div>
                 <a href={`/track?phone=${form.phone}`} className="btn-primary" style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px', textDecoration: 'none' }}> Track My Position Live</a>
-                <button onClick={() => { setStep(1); setToken(null); setPaymentOrder(null); setPaymentStatus(null); setForm({ name:'',phone:'',doctor:'Dr. Praveen Ramachandra',reason:'',email:'',place:'' }); setClinic(''); }} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '13px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Book Another Token</button>
+                <button onClick={() => { setStep(1); setToken(null); setPaymentOrder(null); setPaymentStatus(null); setForm({ name:'',phone:'',doctor:'Dr. Praveen Ramachandra',reason:'',email:'',place:'' }); setClinic(''); setConsultationMode(''); }} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '13px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Book Another Token</button>
               </div>
             )}
           </div>

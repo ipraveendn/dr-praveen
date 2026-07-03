@@ -215,6 +215,7 @@ export default function DoctorDashboard() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '20px', fontWeight: '700', color: '#0A1628', fontFamily: "'Cormorant Garamond',serif" }}>{serving.name}</div>
                     <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}> {serving.phone}</div>
+                    <div style={{ fontSize: '12px', color: '#0B7B6F', fontWeight: '700', marginTop: '4px' }}>{serving.consultationMode || 'N/A'}</div>
                 </div>
                 <span style={{ background: '#FEF3C7', color: '#92400E', padding: '6px 16px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>🔔 Now Consulting</span>
               </div>
@@ -252,6 +253,7 @@ export default function DoctorDashboard() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '14px', fontWeight: '700', color: '#0A1628' }}>{p.name}</div>
                   <div style={{ fontSize: '12px', color: '#64748B' }}>{p.reason}</div>
+                  <div style={{ fontSize: '11px', color: '#0B7B6F', fontWeight: '700', marginTop: '2px' }}>{p.consultationMode || 'N/A'}</div>
                 </div>
                 <span style={{ fontSize: '11px', color: '#0B7B6F', fontWeight: '600' }}>~{(i + 1) * 10} mins wait</span>
               </div>

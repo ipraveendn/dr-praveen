@@ -27,7 +27,9 @@ const getEndOfDay = () => {
 
 
 export const addToken = async (req, res) => {
-  const { name, phone, email, place, reason, clinic, trackingUrl } = req.body;
+  console.log("REQ BODY:", req.body);
+  const { name, phone, email, place, reason, clinic, trackingUrl, consultationMode } = req.body;
+  console.log("consultationMode after destructuring:", consultationMode);
 
   if (!name || !phone || !reason || !clinic) {
     console.error("[addToken] FAIL: Missing required fields.");
@@ -70,6 +72,22 @@ export const addToken = async (req, res) => {
     const nextTokenNumber = lastToken ? lastToken.tokenNumber + 1 : 1;
 
     console.log("[addToken] STEP 6: Creating the new token in the database.");
+    const tokenNumber = nextTokenNumber;
+    const patientId = patient.id;
+    const clinicId = clinicRecord.id;
+    const reasonForVisit = reason;
+    const status = 'WAITING';
+    const appointmentDate = new Date();
+    console.log("Prisma create data:", {
+      tokenNumber,
+      patientId,
+      clinicId,
+      reason,
+      reasonForVisit,
+      consultationMode,
+      status,
+      appointmentDate
+    });
     const tokenRecord = await prisma.token.create({
       data: {
         tokenNumber: nextTokenNumber,
@@ -77,10 +95,12 @@ export const addToken = async (req, res) => {
         clinicId: clinicRecord.id,
         reason : reason,
         reasonForVisit: reason,
+        consultationMode: consultationMode || null,
         status: 'WAITING',
         appointmentDate: new Date(),
       },
     });
+    console.log("Created Token:", tokenRecord);
     
     const waitingCount = await prisma.token.count({ where: { status: 'WAITING', clinicId: clinicRecord.id, appointmentDate: { gte: todayStart, lte: todayEnd } } });
     const estimatedTime = (waitingCount - 1) * 5;
@@ -115,7 +135,8 @@ export const addToken = async (req, res) => {
           name: t.patient.name,
           status: t.status,
           phone: t.patient.phone,
-          reason: t.reasonForVisit
+            reason: t.reasonForVisit,
+            consultationMode: t.consultationMode || null
         }))
       }, 
       message: "Token created successfully." 
@@ -165,6 +186,7 @@ export const getQueueData = async (req, res) => {
         tokenNumber: true,
         status: true,
         reasonForVisit: true,
+        consultationMode: true,
         patient: {
           select: {
             name: true,
@@ -195,7 +217,8 @@ export const getQueueData = async (req, res) => {
         status: t.status,
         clinic: t.clinic.name,
         phone: t.patient.phone,
-        reason: t.reasonForVisit
+        reason: t.reasonForVisit,
+        consultationMode: t.consultationMode || null
       })),
     };
 
@@ -249,6 +272,7 @@ export const trackQueue = async (req, res) => {
         patient: token.patient.name,
         clinic: token.clinic.name,
         status: token.status,
+        consultationMode: token.consultationMode || null,
         tokensAhead,
         estimatedWaitTime: `${tokensAhead * 5} mins`,
       }
@@ -339,7 +363,8 @@ export const callNextPatient = async (req, res) => {
               tokenNumber: t.tokenNumber,
               name: t.patient.name,
               status: t.status,
-              phone: t.patient.phone
+              phone: t.patient.phone,
+              consultationMode: t.consultationMode || null
             }))
           }
         };
@@ -543,7 +568,8 @@ export const completeConsultationByTokenNumber = async (req, res) => {
                     status: t.status,
                     clinic: t.clinic.name,
                     phone: t.patient.phone,
-                    reason: t.reasonForVisit
+                  reason: t.reasonForVisit,
+                  consultationMode: t.consultationMode || null
                 }))
             }
         });

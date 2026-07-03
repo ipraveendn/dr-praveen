@@ -326,6 +326,7 @@ export default function AdminDashboard() {
                     </div>
                     <div style={{ fontWeight: '700', color: '#0A1628', marginTop: '4px', fontSize: '14px' }}>{serving.name}</div>
                     <div style={{ fontSize: '12px', color: '#64748B' }}>{serving.reason ?? serving.phone}</div>
+                    <div style={{ fontSize: '11px', color: '#0B7B6F', fontWeight: '700', marginTop: '4px' }}>{serving.consultationMode || 'N/A'}</div>
                   </div>
                   <button onClick={markDone} disabled={completeLoading} style={{
                     width: '100%', background: '#0B7B6F', color: '#fff',
@@ -445,6 +446,7 @@ export default function AdminDashboard() {
                     <div style={{ fontSize: '11px', color: '#64748B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {p.reason ?? ''}{p.phone ? ` · ${p.phone}` : ''}
                     </div>
+                    <div style={{ fontSize: '10px', color: '#0B7B6F', fontWeight: '700', marginTop: '2px' }}>{p.consultationMode || 'N/A'}</div>
                   </div>
                   <span style={{
                     padding: '3px 10px', borderRadius: '20px', fontSize: '10px', fontWeight: '700', flexShrink: 0,
