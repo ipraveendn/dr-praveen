@@ -221,11 +221,11 @@ export default function Queue() {
 
         {/* Progress */}
         {step < 6 && (
-          <div style={{ background: '#fff', borderBottom: '1px solid #E2EEEC', padding: '16px 5%', display: 'flex', justifyContent: 'center', gap: '8px', alignItems: 'center' }}>
+          <div className="queue-progress" style={{ background: '#fff', borderBottom: '1px solid #E2EEEC', padding: '12px 5%', display: 'flex', justifyContent: 'center', gap: '8px', alignItems: 'center' }}>
             {['Choose Clinic','Consultation Mode','Your Details','Confirm','Payment'].map((s, i) => (
               <div key={s} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: step > i + 1 ? '#0B7B6F' : step === i + 1 ? '#0B7B6F' : '#E2EEEC', color: step >= i + 1 ? '#fff' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700' }}>{step > i + 1 ? '✓' : i + 1}</div>
-                <span style={{ fontSize: '13px', fontWeight: step === i + 1 ? '700' : '400', color: step === i + 1 ? '#0A1628' : '#64748B' }}>{s}</span>
+                <div className="queue-step-circle" style={{ width: '28px', height: '28px', borderRadius: '50%', background: step > i + 1 ? '#0B7B6F' : step === i + 1 ? '#0B7B6F' : '#E2EEEC', color: step >= i + 1 ? '#fff' : '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700' }}>{step > i + 1 ? '✓' : i + 1}</div>
+                <span className="queue-step-label" style={{ fontSize: '13px', fontWeight: step === i + 1 ? '700' : '400', color: step === i + 1 ? '#0A1628' : '#64748B' }}>{s}</span>
                 {i < 4 && <span style={{ color: '#E2EEEC', fontSize: '16px' }}>›</span>}
               </div>
             ))}
@@ -309,7 +309,7 @@ export default function Queue() {
                   </select>
                 </div>
                 {error && <p style={{ color: '#ef4444', fontSize: '13px', marginBottom: '16px' }}>⚠️ {error}</p>}
-                <div style={{ display: 'flex', gap: '10px' }}>
+                <div className="action-row" style={{ display: 'flex', gap: '10px' }}>
                   <button onClick={() => setStep(1)} className="btn-secondary" style={{ flex: 1 }}>← Back</button>
                   <button onClick={() => { if (!form.name || !form.phone || !form.reason) { setError('Please fill all fields'); return; } setError(''); setStep(4); }} className="btn-primary" style={{ flex: 2 }}>Continue →</button>
                 </div>
@@ -336,7 +336,7 @@ export default function Queue() {
                 ))}
                 <p style={{ color: '#64748B', fontSize: '13px', margin: '20px 0', lineHeight: '1.6' }}> You will receive an SMS with your token number and a live tracking link on <strong>{form.phone}</strong></p>
                 {error && <p style={{ color: '#ef4444', fontSize: '13px', marginBottom: '12px' }}>⚠️ {error}</p>}
-                <div style={{ display: 'flex', gap: '10px' }}>
+                <div className="action-row" style={{ display: 'flex', gap: '10px' }}>
                   <button onClick={() => setStep(3)} className="btn-secondary" style={{ flex: 1 }}>← Edit</button>
                   <button onClick={proceedToPayment} className="btn-primary" style={{ flex: 2 }}>
                     Proceed to Payment Options
@@ -435,7 +435,7 @@ export default function Queue() {
                 )}
 
                 {error && <p style={{ color: '#ef4444', fontSize: '13px', marginBottom: '12px' }}>⚠️ {error}</p>}
-                <div style={{ display: 'flex', gap: '10px' }}>
+                <div className="action-row" style={{ display: 'flex', gap: '10px' }}>
                   <button onClick={() => setStep(4)} className="btn-secondary" style={{ flex: 1 }}>← Back</button>
                   <button onClick={() => {
                     if (paymentMethod === 'online' && !paymentScreenshot) {
@@ -485,6 +485,18 @@ export default function Queue() {
             .queue-container img[alt*="QR"] { width: 160px !important; height: 160px !important; }
             /* Make payment upload full width */
             .queue-container input[type="file"] { width: 100% !important; }
+          }
+          /* Progress bar wrapping */
+          .queue-progress { flex-wrap: wrap; gap: 8px; }
+          .queue-progress .queue-step-label { display: inline-block; margin-right: 8px; }
+
+          .action-row { display: flex; gap: 10px; }
+          @media (max-width: 480px) {
+            .action-row { flex-direction: column; }
+            .action-row .btn-primary, .action-row .btn-secondary { width: 100% !important; flex: none !important; }
+            .queue-progress { padding: 8px 6px !important; }
+            .queue-progress .queue-step-circle { width: 26px !important; height: 26px !important; }
+            .queue-progress .queue-step-label { font-size: 12px !important; }
           }
         `}</style>
       </div>
