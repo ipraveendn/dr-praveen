@@ -232,7 +232,7 @@ export default function Queue() {
           </div>
         )}
 
-        <div style={{ maxWidth: '560px', margin: '48px auto', padding: '0 5%' }}>
+        <div className="queue-container" style={{ maxWidth: '560px', margin: '48px auto', padding: '0 5%' }}>
           <div style={{ background: '#fff', borderRadius: '20px', padding: '40px', boxShadow: '0 4px 24px rgba(11,123,111,0.08)', border: '1px solid #E2EEEC' }}>
 
             {/* Step 1 — Choose Clinic */}
@@ -454,9 +454,9 @@ export default function Queue() {
             {/* Step 6 — Success */}
             {step === 6 && token && (
               <div style={{ textAlign: 'center' }}>
-                <div style={{ background: 'linear-gradient(135deg,#0B7B6F,#096358)', borderRadius: '20px', padding: '32px', marginBottom: '24px' }}>
+                <div className="token-box" style={{ background: 'linear-gradient(135deg,#0B7B6F,#096358)', borderRadius: '20px', padding: '32px', marginBottom: '24px' }}>
                   <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '8px' }}>Your Queue Token</div>
-                  <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '80px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>#{String(token).padStart(2,'0')}</div>
+                  <div className="token-number" style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '80px', fontWeight: '800', color: '#fff', lineHeight: '1' }}>#{String(token).padStart(2,'0')}</div>
                   <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', marginTop: '8px' }}>{clinicObj?.name}</div>
                 </div>
                 <div style={{ background: '#E6F4F2', borderRadius: '14px', padding: '16px', marginBottom: '20px' }}>
@@ -470,6 +470,23 @@ export default function Queue() {
           </div>
           <LiveQueue data={queueData} />
         </div>
+        <style>{`
+          /* Queue responsive tweaks */
+          .queue-container { max-width: 560px; }
+
+          .token-number { font-size: 80px; }
+
+          @media (max-width: 480px) {
+            .token-number { font-size: 46px !important; }
+            .token-box { padding: 20px !important; }
+            .queue-container .btn-primary, .queue-container .btn-secondary { width: 100% !important; }
+            .queue-container .btn-primary[style] { flex: none !important; }
+            /* Reduce QR size */
+            .queue-container img[alt*="QR"] { width: 160px !important; height: 160px !important; }
+            /* Make payment upload full width */
+            .queue-container input[type="file"] { width: 100% !important; }
+          }
+        `}</style>
       </div>
     </>
   )

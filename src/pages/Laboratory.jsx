@@ -458,9 +458,8 @@ export default function Laboratory() {
                 Book Your Test
               </h2>
 
-              <div style={{
+              <div className="lab-booking-grid" style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
                 gap: '30px'
               }}>
                 {/* LEFT: FORM */}
@@ -695,6 +694,16 @@ export default function Laboratory() {
             </div>
           </div>
         </section>
+
+        <style>{`
+          .lab-booking-grid { grid-template-columns: 1fr 1fr; }
+
+          @media (max-width: 768px) {
+            .lab-booking-grid { grid-template-columns: 1fr !important; gap: 18px; }
+            .lab-booking-grid > div { padding: 18px !important; }
+            .lab-booking-grid .btn-primary, .lab-booking-grid .btn-secondary { width: 100% !important; }
+          }
+        `}</style>
 
         {/* WHY CHOOSE US */}
         <section style={{ padding: '70px 5%', background: 'linear-gradient(180deg, #F8FAFA 0%, #F4FBFA 100%)' }}>
