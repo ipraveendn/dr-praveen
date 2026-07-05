@@ -65,11 +65,39 @@ export default function Pharmacy() {
                 <p style={{
                   color: '#64748B',
                   lineHeight: '1.8',
-                  marginBottom: '32px',
+                  marginBottom: '24px',
                   fontSize: '15px'
                 }}>
-                  Upload your prescription, request medication customization, or contact the hospital for assistance. Our pharmacy team will review your request and follow up with next steps.
+                  Upload your prescription to request home delivery, fast delivery, and same-day delivery where available. Online and cash payments are also accepted, and our pharmacy team will review your request and follow up with next steps.
                 </p>
+
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: '16px',
+                  marginBottom: '28px'
+                }}>
+                  {[
+                    { title: 'Home delivery', text: 'Medicines can be delivered directly to your home.' },
+                    { title: 'Fast delivery', text: 'Quick delivery support for urgent prescription needs.' },
+                    { title: 'Same-day delivery', text: 'Available after your prescription is uploaded and reviewed.' },
+                    { title: 'Payment options', text: 'Online and cash payments are accepted for convenience.' }
+                  ].map((item, index) => (
+                    <div key={index} style={{
+                      background: '#fff',
+                      borderRadius: '16px',
+                      border: '1px solid #E2EEEC',
+                      padding: '20px'
+                    }}>
+                      <h3 style={{ fontSize: '16px', marginBottom: '8px', color: '#0A1628', fontWeight: '700' }}>
+                        {item.title}
+                      </h3>
+                      <p style={{ color: '#64748B', fontSize: '13px', lineHeight: '1.7', margin: 0 }}>
+                        {item.text}
+                      </p>
+                    </div>
+                  ))}
+                </div>
 
                 <div style={{ display: 'grid', gap: '28px' }}>
                   <div style={{
