@@ -8,7 +8,8 @@ import {
   Navigation
 } from "lucide-react";
 
-import clinicImg from "../assets/images/clinic.jpg"; // ✅ FIXED
+import clinicImg from "../assets/images/clinic.jpg";
+import thyroplusImg from "../assets/images/thyroplus logo.jpeg";
 
 export default function ClinicsCard() {
   return (
@@ -61,8 +62,8 @@ export default function ClinicsCard() {
 
               {/* 🔥 IMAGE ADDED (TOP) */}
               <img
-                src={clinicImg}
-                alt="Clinic"
+                src={c.id === 'thyroplus' ? thyroplusImg : clinicImg}
+                alt={c.name}
                 style={{
                   width: '100%',
                   height: '180px',
