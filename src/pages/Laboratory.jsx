@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Helmet } from 'react-helmet-async'
+import { DOCTOR } from '../data/content'
 
 // Individual Tests
 const TESTS = [
@@ -188,10 +189,10 @@ export default function Laboratory() {
 
     try {
       await new Promise(resolve => setTimeout(resolve, 600))
-      setBookingStatus('Booking request received. Our team will contact you shortly.')
+      setBookingStatus(`Booking confirmed. For further details, call ${DOCTOR.phone}.`)
     } catch (error) {
       setBookingStatus('')
-      setBookingError('Unable to process your booking. Please try again.')
+      setBookingError(`Unable to complete your booking. Please try again or call ${DOCTOR.phone} for assistance.`)
       console.error('[LABORATORY BOOKING ERROR]', error)
     } finally {
       setIsSubmitting(false)
