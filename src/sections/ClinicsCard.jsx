@@ -10,6 +10,7 @@ import {
 
 import clinicImg from "../assets/images/clinic.jpg";
 import thyroplusImg from "../assets/images/thyroplus logo.jpeg";
+import diaplusImg from "../assets/images/diapluslogo.jpg";
 
 export default function ClinicsCard() {
   return (
@@ -62,7 +63,7 @@ export default function ClinicsCard() {
 
               {/* 🔥 IMAGE ADDED (TOP) */}
               <img
-                src={c.id === 'thyroplus' ? thyroplusImg : clinicImg}
+                src={c.id === 'thyroplus' ? thyroplusImg : c.id === 'diaplus' ? diaplusImg : clinicImg}
                 alt={c.name}
                 style={{
                   width: '100%',
