@@ -138,6 +138,13 @@ export default function ClinicsCard() {
             grid-template-columns: 1fr !important;
           }
         }
+        
+        /* Image sizing: keep covers on desktop, reduce height on mobile */
+        .clinic-grid img { height: 180px; object-fit: cover; object-position: center; }
+
+        @media (max-width: 900px) {
+          .clinic-grid img { height: 140px !important; }
+        }
       `}</style>
 
     </section>

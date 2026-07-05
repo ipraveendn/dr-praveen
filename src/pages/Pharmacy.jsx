@@ -72,9 +72,8 @@ export default function Pharmacy() {
                 </p>
               </div>
 
-              <div style={{
+              <div className="pharmacy-grid" style={{
                 display: 'grid',
-                gridTemplateColumns: '1.1fr 0.9fr',
                 gap: '24px',
                 alignItems: 'stretch'
               }}>
@@ -211,6 +210,16 @@ export default function Pharmacy() {
             </div>
           </div>
         </section>
+
+        <style>{`
+          .pharmacy-grid { grid-template-columns: 1.1fr 0.9fr; }
+
+          @media (max-width: 768px) {
+            .pharmacy-grid { grid-template-columns: 1fr !important; gap: 16px; }
+            .pharmacy-grid > div { padding: 20px !important; }
+            .pharmacy-grid textarea { min-height: 140px !important; }
+          }
+        `}</style>
 
         {/* BENEFITS SECTION */}
         <section style={{ padding: '60px 5%', background: '#F8FAFA' }}>
