@@ -35,11 +35,11 @@ export default function Pharmacy() {
           <p style={{
             color: 'rgba(255,255,255,0.65)',
             fontSize: '15px',
-            maxWidth: '560px',
+            maxWidth: '640px',
             margin: '0 auto',
             lineHeight: '1.7'
           }}>
-            Upload your prescription, request customization, or contact the hospital for support.
+            Upload your prescription or request medication customization, and our pharmacy team will arrange home delivery of your medicines.
           </p>
         </div>
 
@@ -60,7 +60,7 @@ export default function Pharmacy() {
                   marginBottom: '16px',
                   color: '#0A1628'
                 }}>
-                  Pharmacy support and prescription upload
+                  Prescription-based home medicine delivery
                 </h2>
                 <p style={{
                   color: '#64748B',
@@ -68,7 +68,7 @@ export default function Pharmacy() {
                   marginBottom: '24px',
                   fontSize: '15px'
                 }}>
-                  Upload your prescription to request home delivery, fast delivery, and same-day delivery where available. Online and cash payments are also accepted, and our pharmacy team will review your request and follow up with next steps.
+                  Upload your prescription or request medication customization. Our pharmacy team will review your request and arrange delivery of your medicines to your home.
                 </p>
 
                 <div style={{
@@ -78,10 +78,10 @@ export default function Pharmacy() {
                   marginBottom: '28px'
                 }}>
                   {[
-                    { title: 'Home delivery', text: 'Medicines can be delivered directly to your home.' },
-                    { title: 'Fast delivery', text: 'Quick delivery support for urgent prescription needs.' },
-                    { title: 'Same-day delivery', text: 'Available after your prescription is uploaded and reviewed.' },
-                    { title: 'Payment options', text: 'Online and cash payments are accepted for convenience.' }
+                    { title: 'Home delivery', text: 'Medicines delivered directly to your address.' },
+                    { title: 'Fast delivery', text: 'Quick support for urgent prescription needs.' },
+                    { title: 'Same-day service', text: 'Available after prescription review.' },
+                    { title: 'Flexible payment', text: 'Online and cash payment options available.' }
                   ].map((item, index) => (
                     <div key={index} style={{
                       background: '#fff',
@@ -99,79 +99,76 @@ export default function Pharmacy() {
                   ))}
                 </div>
 
-                <div style={{ display: 'grid', gap: '28px' }}>
+                <div style={{ display: 'grid', gap: '24px' }}>
                   <div style={{
-                    background: '#fff',
-                    borderRadius: '20px',
-                    border: '1px solid #E2EEEC',
-                    padding: '30px'
+                    display: 'grid',
+                    gridTemplateColumns: '1.1fr 0.9fr',
+                    gap: '24px',
+                    alignItems: 'stretch'
                   }}>
-                    <h3 style={{ fontSize: '20px', marginBottom: '14px', color: '#0A1628', fontWeight: '700' }}>
-                      Upload prescription
-                    </h3>
-                    <p style={{ color: '#64748B', fontSize: '14px', lineHeight: '1.75', marginBottom: '22px' }}>
-                      Send a clear photo or PDF of your prescription. This helps us verify the medicine requirements accurately and prepare your order.
-                    </p>
-                    <input
-                      type="file"
-                      id="prescription-upload"
-                      accept="image/*,.pdf"
-                      onChange={(e) => setPrescription(e.target.files[0]?.name || null)}
-                      style={{ display: 'none' }}
-                    />
-                    <label htmlFor="prescription-upload" style={{
-                      display: 'inline-block',
-                      background: '#0B7B6F',
-                      color: '#fff',
-                      padding: '14px 26px',
-                      borderRadius: '12px',
-                      cursor: 'pointer',
-                      fontWeight: '700',
-                      fontSize: '14px'
+                    <div style={{
+                      background: '#fff',
+                      borderRadius: '20px',
+                      border: '1px solid #E2EEEC',
+                      padding: '30px'
                     }}>
-                      Upload file
-                    </label>
-                    {prescription && (
-                      <div style={{
-                        marginTop: '18px',
-                        color: '#0A1628',
-                        fontSize: '14px',
-                        lineHeight: '1.6'
+                      <h3 style={{ fontSize: '20px', marginBottom: '14px', color: '#0A1628', fontWeight: '700' }}>
+                        Upload prescription
+                      </h3>
+                      <p style={{ color: '#64748B', fontSize: '14px', lineHeight: '1.75', marginBottom: '22px' }}>
+                        Upload a clear photo or PDF of your prescription so our pharmacy team can verify it and prepare the delivery.
+                      </p>
+                      <input
+                        type="file"
+                        id="prescription-upload"
+                        accept="image/*,.pdf"
+                        onChange={(e) => setPrescription(e.target.files[0]?.name || null)}
+                        style={{ display: 'none' }}
+                      />
+                      <label htmlFor="prescription-upload" style={{
+                        display: 'inline-block',
+                        background: '#0B7B6F',
+                        color: '#fff',
+                        padding: '14px 26px',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        fontWeight: '700',
+                        fontSize: '14px'
                       }}>
-                        Selected file: {prescription}
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                    <div style={{
-                      background: '#fff',
-                      borderRadius: '20px',
-                      border: '1px solid #E2EEEC',
-                      padding: '28px'
-                    }}>
-                      <h3 style={{ fontSize: '18px', marginBottom: '12px', color: '#0A1628', fontWeight: '700' }}>
-                        Contact the hospital
-                      </h3>
-                      <p style={{ color: '#64748B', fontSize: '14px', lineHeight: '1.75', marginBottom: '16px' }}>
-                        For urgent support or questions about your prescription, reach out to the hospital directly.
-                      </p>
-                      <div style={{ fontWeight: '700', color: '#0B7B6F', fontSize: '14px' }}>
-                        Phone: <a href="tel:08041675151" style={{ color: '#0B7B6F', textDecoration: 'none' }}>08041675151</a>
-                      </div>
+                        Upload prescription
+                      </label>
+                      {prescription && (
+                        <div style={{
+                          marginTop: '18px',
+                          color: '#0A1628',
+                          fontSize: '14px',
+                          lineHeight: '1.6'
+                        }}>
+                          Selected file: {prescription}
+                        </div>
+                      )}
                     </div>
+
                     <div style={{
                       background: '#fff',
                       borderRadius: '20px',
                       border: '1px solid #E2EEEC',
-                      padding: '28px'
+                      padding: '30px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between'
                     }}>
-                      <h3 style={{ fontSize: '18px', marginBottom: '12px', color: '#0A1628', fontWeight: '700' }}>
-                        Request customization
-                      </h3>
-                      <p style={{ color: '#64748B', fontSize: '14px', lineHeight: '1.75' }}>
-                        Specify brand preferences, dosage details, or alternate medication needs and our team will support your request.
-                      </p>
+                      <div>
+                        <h3 style={{ fontSize: '20px', marginBottom: '14px', color: '#0A1628', fontWeight: '700' }}>
+                          Request customization
+                        </h3>
+                        <p style={{ color: '#64748B', fontSize: '14px', lineHeight: '1.75', marginBottom: '16px' }}>
+                          Share your preferred brand, dosage requirement, or any special instruction and we will assist with the order.
+                        </p>
+                      </div>
+                      <div style={{ fontWeight: '700', color: '#0B7B6F', fontSize: '14px' }}>
+                        Need urgent help? Call the hospital at <a href="tel:08041675151" style={{ color: '#0B7B6F', textDecoration: 'none' }}>08041675151</a>
+                      </div>
                     </div>
                   </div>
 
@@ -187,7 +184,7 @@ export default function Pharmacy() {
                     <textarea
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Write any special instructions or customization requests here"
+                      placeholder="Add any special instruction, preferred brand, or request for home delivery"
                       style={{
                         width: '100%',
                         minHeight: '140px',
@@ -211,7 +208,7 @@ export default function Pharmacy() {
                           setRequestStatus('')
                           return
                         }
-                        setRequestStatus('Your request has been submitted. Our pharmacy team will contact you soon.')
+                        setRequestStatus('Your request has been submitted. Our pharmacy team will contact you soon to arrange home delivery.')
                       }}
                       style={{
                         background: '#0B7B6F',
