@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url'
 import authRoutes from './routes/auth.js'
 import queueRoutes from './routes/queue.js'
 import paymentRoutes from './routes/payment.js'
+import notificationRoutes from './routes/notifications.js'
 
 // Get current directory for ES modules
 const __filename = fileURLToPath(import.meta.url)
@@ -201,6 +202,7 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authLimiter, authRoutes)
 app.use('/api/queue', queueLimiter, queueRoutes)
 app.use('/api/payment', paymentLimiter, paymentRoutes)
+app.use('/api/notifications', notificationRoutes)
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

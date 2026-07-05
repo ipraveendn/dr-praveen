@@ -169,6 +169,95 @@ export async function sendSMS(phone, message) {
 }
 
 /**
+ * Send WhatsApp message via Twilio WhatsApp channel
+ * @param {string} phone - Phone number with country code
+ * @param {string} message - WhatsApp message body
+ * @returns {Promise<Object>} - Response with send result
+ */
+export async function sendWhatsApp(phone, message) {
+  try {
+    console.log('\n' + '='.repeat(70))
+    console.log('[WHATSAPP SERVICE] Starting WhatsApp send process...')
+    console.log('='.repeat(70))
+
+    if (!twilioClient) {
+      console.error('[ERROR] Twilio client not initialized')
+      return { success: false, reason: 'TWILIO_NOT_INITIALIZED' }
+    }
+
+    const formattedPhone = formatPhoneNumber(phone)
+    if (!formattedPhone) {
+      console.error('[ERROR] Failed to format phone number for WhatsApp')
+      return { success: false, reason: 'INVALID_PHONE_NUMBER' }
+    }
+
+    const whatsappFrom = process.env.TWILIO_WHATSAPP_FROM
+    if (!whatsappFrom) {
+      console.error('[ERROR] TWILIO_WHATSAPP_FROM not configured in .env')
+      return { success: false, reason: 'WHATSAPP_FROM_NOT_CONFIGURED' }
+    }
+
+    const fromValue = whatsappFrom.startsWith('whatsapp:') ? whatsappFrom : `whatsapp:${whatsappFrom}`
+    const toValue = `whatsapp:${formattedPhone}`
+
+    console.log('\n[TWILIO WHATSAPP REQUEST]')
+    console.log('  From:', fromValue)
+    console.log('  To:', toValue)
+    console.log('  Message length:', message.length)
+
+    const smsResponse = await twilioClient.messages.create({
+      from: fromValue,
+      to: toValue,
+      body: message
+    })
+
+    console.log('\n[TWILIO RESPONSE]')
+    console.log('  Status:', smsResponse.status)
+    console.log('  SID:', smsResponse.sid)
+    console.log('  To:', smsResponse.to)
+
+    if (['queued', 'sent', 'sending', 'accepted'].includes(smsResponse.status)) {
+      return {
+        success: true,
+        data: {
+          messageSid: smsResponse.sid,
+          status: smsResponse.status,
+          to: smsResponse.to
+        }
+      }
+    }
+
+    return {
+      success: false,
+      error: `Unexpected WhatsApp status: ${smsResponse.status}`,
+      status: smsResponse.status
+    }
+  } catch (error) {
+    console.log('\n[ERROR CAUGHT]')
+    console.error('  Error Type:', error.name)
+    console.error('  Error Message:', error.message)
+
+    if (error.response) {
+      console.error('\n[TWILIO API ERROR]')
+      console.error('  Status Code:', error.response?.status)
+      console.error('  Error Code:', error.code)
+      console.error('  Details:', error.response?.data || error.message)
+    } else if (error.request) {
+      console.error('  No response received from Twilio')
+    }
+
+    console.log('='.repeat(70))
+
+    return {
+      success: false,
+      error: error.message,
+      details: error.response?.data || error.message,
+      errorCode: error.code
+    }
+  }
+}
+
+/**
  * Send appointment token notification SMS
  * @param {string} phone - Phone number with country code
  * @param {string} patientName - Patient name

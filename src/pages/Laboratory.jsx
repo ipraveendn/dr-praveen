@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Helmet } from 'react-helmet-async'
-import { Link } from 'react-router-dom'
+import { apiRequest } from '../utils/api'
 
 // Individual Tests
 const TESTS = [
@@ -141,6 +141,9 @@ export default function Laboratory() {
   const [phone, setPhone] = useState('')
   const [date, setDate] = useState('')
   const [reportAccess, setReportAccess] = useState('email')
+  const [bookingStatus, setBookingStatus] = useState('')
+  const [bookingError, setBookingError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const toggleTest = (test) => {
     setSelectedTests(prev => 
@@ -165,6 +168,50 @@ export default function Laboratory() {
   const getTotalPrice = () => {
     if (selectedPackage) return selectedPackage.price
     return selectedTests.reduce((sum, t) => sum + t.price, 0)
+  }
+
+  const handleBooking = async () => {
+    if (!phone || !address || !date) {
+      setBookingStatus('')
+      setBookingError('Please fill all required fields before confirming your booking.')
+      return
+    }
+
+    if (getTotalPrice() === 0) {
+      setBookingStatus('')
+      setBookingError('Please select a package or individual tests.')
+      return
+    }
+
+    setIsSubmitting(true)
+    setBookingError('')
+    setBookingStatus('')
+
+    const bookingPayload = {
+      phone,
+      patientName: 'Patient',
+      appointmentDate: date,
+      collectionAddress: address,
+      collectionType,
+      reportAccess,
+      totalAmount: getTotalPrice(),
+      selectedPackageName: selectedPackage?.name || null,
+      selectedTests: selectedPackage ? null : selectedTests.map(t => t.name).join(', ')
+    }
+
+    try {
+      const response = await apiRequest('/notifications/whatsapp', {
+        method: 'POST',
+        body: JSON.stringify(bookingPayload)
+      })
+      setBookingStatus(response.message || 'WhatsApp confirmation sent successfully.')
+    } catch (error) {
+      setBookingStatus('')
+      setBookingError(error.message || 'Unable to send WhatsApp confirmation. Please try again.')
+      console.error('[LABORATORY BOOKING ERROR]', error)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -333,7 +380,7 @@ export default function Laboratory() {
                           marginBottom: '16px',
                           lineHeight: '1.6'
                         }}>
-                          {pkg.tests.join(' • ')}
+                          {pkg.tests.join(', ')}
                         </p>
                         <p style={{
                           fontSize: '28px',
@@ -396,13 +443,6 @@ export default function Laboratory() {
                     onChange={() => {}}
                     style={{ marginBottom: '8px', cursor: 'pointer' }}
                   />
-                  <div style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    background: test.color,
-                    marginBottom: '12px'
-                  }}></div>
                   <h5 style={{ fontSize: '14px', fontWeight: '700', color: '#0A1628', marginBottom: '6px' }}>
                     {test.name}
                   </h5>
@@ -515,7 +555,7 @@ export default function Laboratory() {
                             onChange={(e) => setReportAccess(e.target.value)}
                           />
                           <span style={{ fontSize: '14px', fontWeight: '500', color: '#0A1628' }}>
-                            {method === 'email' ? '📧 Email' : method === 'portal' ? '🌐 Portal' : '📱 App'}
+                            {method === 'email' ? 'Email' : method === 'portal' ? 'Portal' : 'App'}
                           </span>
                         </label>
                       ))}
@@ -531,7 +571,7 @@ export default function Laboratory() {
                     color: '#0B7B6F',
                     lineHeight: '1.6'
                   }}>
-                    <strong>💡 Pro Tip:</strong> Fast for 8-10 hours before blood collection for accurate results
+                    <strong>Pro Tip:</strong> Fast for 8-10 hours before blood collection for accurate results
                   </div>
                 </div>
 
@@ -555,10 +595,10 @@ export default function Laboratory() {
                       marginBottom: '20px'
                     }}>
                       <h5 style={{ fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>
-                        {selectedPackage.icon} {selectedPackage.name}
+                        {selectedPackage.name}
                       </h5>
                       <p style={{ fontSize: '12px', color: '#94A3B8', lineHeight: '1.5' }}>
-                        {selectedPackage.tests.join(' • ')}
+                        {selectedPackage.tests.join(', ')}
                       </p>
                       <p style={{ fontSize: '16px', fontWeight: '700', color: '#0B7B6F', marginTop: '12px' }}>
                         ₹{selectedPackage.price}
@@ -637,30 +677,34 @@ export default function Laboratory() {
                   </div>
 
                   <button 
-                    onClick={() => {
-                      if (!phone || !address || !date) {
-                        alert('Please fill all fields')
-                        return
-                      }
-                      alert('Test appointment booked! You will receive confirmation via WhatsApp.')
-                    }}
-                    disabled={getTotalPrice() === 0}
+                    onClick={handleBooking}
+                    disabled={getTotalPrice() === 0 || isSubmitting}
                     style={{
                       width: '100%',
-                      background: getTotalPrice() === 0 ? '#cbd5e1' : 'linear-gradient(135deg,#0B7B6F,#096358)',
+                      background: getTotalPrice() === 0 || isSubmitting ? '#cbd5e1' : 'linear-gradient(135deg,#0B7B6F,#096358)',
                       color: '#fff',
                       border: 'none',
                       padding: '14px',
                       borderRadius: '10px',
                       fontWeight: '700',
                       fontSize: '15px',
-                      cursor: getTotalPrice() === 0 ? 'not-allowed' : 'pointer',
+                      cursor: getTotalPrice() === 0 || isSubmitting ? 'not-allowed' : 'pointer',
                       marginTop: '20px',
                       transition: 'all 0.3s'
                     }}
                   >
-                    ✓ Book Test Now
+                    {isSubmitting ? 'Sending confirmation...' : 'Book Test Now'}
                   </button>
+                  {bookingStatus && (
+                    <div style={{ marginTop: '16px', color: '#0B7B6F', fontWeight: '600' }}>
+                      {bookingStatus}
+                    </div>
+                  )}
+                  {bookingError && (
+                    <div style={{ marginTop: '16px', color: '#DC2626', fontWeight: '600' }}>
+                      {bookingError}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -686,12 +730,12 @@ export default function Laboratory() {
               gap: '24px'
             }}>
               {[
-                { icon: '🏥', title: 'NABL Accredited', desc: 'Certified laboratory with quality standards' },
-                { icon: '👨‍⚕️', title: 'Doctor Supervised', desc: 'Reports interpreted by Dr. Praveen' },
-                { icon: '🏠', title: 'Home Collection', desc: 'Sample collected at your doorstep' },
-                { icon: '⚡', title: 'Fast Reports', desc: '24-48 hours turnaround time' },
-                { icon: '🔐', title: 'Secure Reports', desc: 'Online portal with encrypted access' },
-                { icon: '💰', title: 'Affordable Rates', desc: 'Best prices on all diagnostic tests' },
+                { title: 'NABL Accredited', desc: 'Certified laboratory with quality standards' },
+                { title: 'Doctor Supervised', desc: 'Reports interpreted by Dr. Praveen' },
+                { title: 'Home Collection', desc: 'Sample collected at your doorstep' },
+                { title: 'Fast Reports', desc: '24-48 hours turnaround time' },
+                { title: 'Secure Reports', desc: 'Online portal with encrypted access' },
+                { title: 'Affordable Rates', desc: 'Best prices on all diagnostic tests' },
               ].map((benefit, i) => (
                 <div key={i} style={{
                   background: '#fff',
@@ -701,8 +745,7 @@ export default function Laboratory() {
                   border: '1px solid #E2EEEC',
                   transition: 'all 0.3s'
                 }}>
-                  <div style={{ fontSize: '32px', marginBottom: '12px' }}>{benefit.icon}</div>
-                  <h4 style={{ fontSize: '14px', fontWeight: '700', color: '#0A1628', marginBottom: '6px', letterSpacing: '0.5px' }}>
+                  <h4 style={{ fontSize: '14px', fontWeight: '700', color: '#0A1628', marginBottom: '12px', letterSpacing: '0.5px' }}>
                     {benefit.title}
                   </h4>
                   <p style={{ fontSize: '13px', color: '#64748B' }}>{benefit.desc}</p>
@@ -730,10 +773,10 @@ export default function Laboratory() {
               gap: '24px'
             }}>
               {[
-                { icon: '🌙', title: 'Night Before', tips: ['Get 8 hours sleep', 'Avoid alcohol', 'Eat light dinner'] },
-                { icon: '⏰', title: 'Morning of Test', tips: ['Fast for 8-10 hours', 'Drink plain water', 'Wear loose sleeves'] },
-                { icon: '🥗', title: 'After Collection', tips: ['Have a light breakfast', 'Drink plenty water', 'Rest for 15 minutes'] },
-                { icon: '📋', title: 'Important Notes', tips: ['Bring doctor note if any', 'List current medicines', 'Inform about allergies'] },
+                { title: 'Night Before', tips: ['Get 8 hours sleep', 'Avoid alcohol', 'Eat a light dinner'] },
+                { title: 'Morning of Test', tips: ['Fast for 8-10 hours', 'Drink plain water', 'Wear loose sleeves'] },
+                { title: 'After Collection', tips: ['Have a light breakfast', 'Drink plenty of water', 'Rest for 15 minutes'] },
+                { title: 'Important Notes', tips: ['Bring doctor note if any', 'List current medicines', 'Inform about allergies'] },
               ].map((section, i) => (
                 <div key={i} style={{
                   background: '#F8FAFA',
@@ -741,13 +784,12 @@ export default function Laboratory() {
                   padding: '20px',
                   border: '1px solid #E2EEEC'
                 }}>
-                  <div style={{ fontSize: '24px', marginBottom: '12px' }}>{section.icon}</div>
                   <h4 style={{ fontSize: '16px', fontWeight: '700', color: '#0A1628', marginBottom: '12px' }}>
                     {section.title}
                   </h4>
-                  <ul style={{ fontSize: '13px', color: '#64748B', lineHeight: '1.8' }}>
+                  <ul style={{ fontSize: '13px', color: '#64748B', lineHeight: '1.8', paddingLeft: '18px' }}>
                     {section.tips.map((tip, j) => (
-                      <li key={j} style={{ marginBottom: '6px' }}>✓ {tip}</li>
+                      <li key={j} style={{ marginBottom: '6px' }}>{tip}</li>
                     ))}
                   </ul>
                 </div>
