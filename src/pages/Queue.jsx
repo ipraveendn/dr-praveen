@@ -53,6 +53,23 @@ export default function Queue() {
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [paymentScreenshot, setPaymentScreenshot] = useState(null)
 
+  const UPI_PAYMENTS = {
+    diaplus: {
+      pa: 'paytmqr64bh34@ptys',
+      pn: 'DiaPlus Clinic'
+    },
+    thyroplus: {
+      pa: 'BHARATPE09895931868@yesbankltd',
+      pn: 'ThyroPlus Clinic'
+    }
+  }
+
+  const getUpiQrUrl = (clinicId) => {
+    const payment = UPI_PAYMENTS[clinicId] || UPI_PAYMENTS.diaplus
+    const upiData = `upi://pay?pa=${payment.pa}&pn=${encodeURIComponent(payment.pn)}&cu=INR`
+    return `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(upiData)}`
+  }
+
   async function fetchQueueData() {
     try {
       const data = await apiRequest("/queue");
@@ -364,11 +381,13 @@ export default function Queue() {
                       </div>
 
                       <div style={{ display: 'grid', justifyItems: 'center', gap: '16px' }}>
-                        <div style={{ width: '220px', height: '220px', borderRadius: '20px', background: '#F8FAFA', border: '1px dashed #CBD5E1', display: 'grid', placeItems: 'center', color: '#64748B', fontSize: '13px', padding: '16px', textAlign: 'center' }}>
-                          {clinicObj?.id === 'thyroplus'
-                            ? 'ThyroPlus QR image goes here'
-                            : 'DiaPlus QR image goes here'}
-                        </div>
+                        <div style={{ width: '220px', height: '220px', borderRadius: '20px', background: '#fff', border: '1px solid #E2EEEC', display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
+                        <img
+                          src={getUpiQrUrl(clinicObj?.id)}
+                          alt={clinicObj?.id === 'thyroplus' ? 'ThyroPlus QR code' : 'DiaPlus QR code'}
+                          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                        />
+                      </div>
                         <div style={{ textAlign: 'center' }}>
                           <div style={{ fontSize: '13px', color: '#0A1628', fontWeight: '700', marginBottom: '6px' }}>UPI ID</div>
                           <div style={{ fontSize: '14px', color: '#0B7B6F', fontWeight: '700' }}>
