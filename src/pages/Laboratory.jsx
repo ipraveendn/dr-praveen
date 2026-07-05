@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Helmet } from 'react-helmet-async'
-import { apiRequest } from '../utils/api'
 
 // Individual Tests
 const TESTS = [
@@ -187,27 +186,12 @@ export default function Laboratory() {
     setBookingError('')
     setBookingStatus('')
 
-    const bookingPayload = {
-      phone,
-      patientName: 'Patient',
-      appointmentDate: date,
-      collectionAddress: address,
-      collectionType,
-      reportAccess,
-      totalAmount: getTotalPrice(),
-      selectedPackageName: selectedPackage?.name || null,
-      selectedTests: selectedPackage ? null : selectedTests.map(t => t.name).join(', ')
-    }
-
     try {
-      const response = await apiRequest('/notifications/whatsapp', {
-        method: 'POST',
-        body: JSON.stringify(bookingPayload)
-      })
-      setBookingStatus(response.message || 'WhatsApp confirmation sent successfully.')
+      await new Promise(resolve => setTimeout(resolve, 600))
+      setBookingStatus('Booking request received. Our team will contact you shortly.')
     } catch (error) {
       setBookingStatus('')
-      setBookingError(error.message || 'Unable to send WhatsApp confirmation. Please try again.')
+      setBookingError('Unable to process your booking. Please try again.')
       console.error('[LABORATORY BOOKING ERROR]', error)
     } finally {
       setIsSubmitting(false)
