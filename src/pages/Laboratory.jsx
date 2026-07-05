@@ -4,14 +4,14 @@ import { Link } from 'react-router-dom'
 
 // Individual Tests
 const TESTS = [
-  { id: 1, name: 'Fasting Blood Sugar', price: 250, time: '2 hours', icon: '🩸' },
-  { id: 2, name: 'HbA1c Test', price: 400, time: '24 hours', icon: '📊' },
-  { id: 3, name: 'Thyroid Profile (TSH)', price: 350, time: '24 hours', icon: '🔬' },
-  { id: 4, name: 'Lipid Profile', price: 450, time: '24 hours', icon: '💓' },
-  { id: 5, name: 'Liver Function Test', price: 500, time: '24 hours', icon: '🫘' },
-  { id: 6, name: 'Kidney Function Test', price: 450, time: '24 hours', icon: '🫐' },
-  { id: 7, name: 'Complete Blood Count', price: 300, time: '24 hours', icon: '🩸' },
-  { id: 8, name: 'Vitamin D Test', price: 350, time: '48 hours', icon: '☀️' },
+  { id: 1, name: 'Fasting Blood Sugar', price: 250, time: '2 hours', color: '#DC2626' },
+  { id: 2, name: 'HbA1c Test', price: 400, time: '24 hours', color: '#2563EB' },
+  { id: 3, name: 'Thyroid Profile (TSH)', price: 350, time: '24 hours', color: '#7C3AED' },
+  { id: 4, name: 'Lipid Profile', price: 450, time: '24 hours', color: '#DB2777' },
+  { id: 5, name: 'Liver Function Test', price: 500, time: '24 hours', color: '#EA580C' },
+  { id: 6, name: 'Kidney Function Test', price: 450, time: '24 hours', color: '#0891B2' },
+  { id: 7, name: 'Complete Blood Count', price: 300, time: '24 hours', color: '#DC2626' },
+  { id: 8, name: 'Vitamin D Test', price: 350, time: '48 hours', color: '#F59E0B' },
 ]
 
 // DiaplusKavach Packages organized by category
@@ -24,7 +24,8 @@ const PACKAGES = [
     category: 'Specialized Endocrinology',
     parameters: 42,
     tests: ['HbA1c', 'TSH Ultra-Sensitive', 'Fasting Blood Sugar (FBS)', 'Cholesterol Total', 'Creatinine', 'CBC', 'Urine Examination'],
-    icon: '🩺',
+    color: '#DC2626',
+    badge: 'DG',
     description: 'A targeted screen for diabetes management including blood sugar, thyroid, and metabolic markers'
   },
   {
@@ -34,7 +35,8 @@ const PACKAGES = [
     category: 'Specialized Endocrinology',
     parameters: 5,
     tests: ['Anti TPO', 'TSH Receptor Antibody', 'Thyroid Profile (T3, T4, TSH)'],
-    icon: '⚗️',
+    color: '#7C3AED',
+    badge: 'TP',
     description: 'Advanced thyroid markers including Anti TPO and TSH Receptor Antibody for comprehensive thyroid evaluation'
   },
   {
@@ -44,7 +46,8 @@ const PACKAGES = [
     category: 'Specialized Endocrinology',
     parameters: 69,
     tests: ['AMH (Anti-Müllerian Hormone)', 'Cortisol (Morning sample)', 'Iron Studies', 'Vitamin D', 'Vitamin B12', 'Thyroid (T3, T4, TSH)', 'LFT', 'KFT', 'Lipid Profile', 'FBS', 'CBC', 'Urine Routine'],
-    icon: '👩‍⚕️',
+    color: '#DB2777',
+    badge: 'YF',
     description: 'Comprehensive hormonal profile for women featuring AMH, Cortisol, and essential micronutrient analysis'
   },
 
@@ -56,7 +59,8 @@ const PACKAGES = [
     category: 'Wellness & Family',
     parameters: 67,
     tests: ['Vitamin D', 'B12', 'Thyroid (T3, T4, TSH)', 'HbA1c', 'Lipid Profile', 'KFT', 'LFT', 'CBC', 'Urine Routine', 'Fasting Blood Sugar'],
-    icon: '✨',
+    color: '#F59E0B',
+    badge: 'HM',
     description: 'A full-body screen including vitamin levels, thyroid, and complete metabolic panel'
   },
   {
@@ -66,7 +70,8 @@ const PACKAGES = [
     category: 'Wellness & Family',
     parameters: 53,
     tests: ['Complete Wellness Screening', 'TSH', 'Lipid Profile', 'KFT', 'LFT', 'CBC', 'Urine Routine', 'FBS'],
-    icon: '💚',
+    color: '#16A34A',
+    badge: 'CW',
     description: 'Extended wellness screening covering thyroid, and body screen including vitamin D for two'
   },
   {
@@ -76,7 +81,8 @@ const PACKAGES = [
     category: 'Wellness & Family',
     parameters: 71,
     tests: ['Extensive wellness screening', 'TSH', 'Lipid Profile', 'KFT', 'LFT', 'CBC', 'Urine Routine', 'FBS', 'Ovarian Marker', 'Iron Studies', 'Calcium'],
-    icon: '👑',
+    color: '#D97706',
+    badge: 'TC',
     description: 'Comprehensive package for two with extended parameter coverage for complete health assessment'
   },
 
@@ -88,7 +94,8 @@ const PACKAGES = [
     category: 'Specialized Care',
     parameters: 12,
     tests: ['Advanced cardiac screening', 'Apolipoprotein A1', 'Apolipoprotein B', 'AB Ratio', 'Lipid Profile', 'FBS', 'HsCRP'],
-    icon: '❤️',
+    color: '#DC2626',
+    badge: 'HC',
     description: 'Advanced cardiac screening including Apolipoprotein A1 and AB Ratio for heart health'
   },
   {
@@ -98,7 +105,8 @@ const PACKAGES = [
     category: 'Specialized Care',
     parameters: 40,
     tests: ['HB Electrophoresis', 'Iron Studies', 'Ferritin', 'Folic Acid', 'Vitamin B12', 'CBC'],
-    icon: '🩸',
+    color: '#7C3AED',
+    badge: 'AP',
     description: 'Includes HB Electrophoresis and comprehensive iron studies for anemia diagnosis'
   },
   {
@@ -108,7 +116,8 @@ const PACKAGES = [
     category: 'Fever Screening',
     parameters: 45,
     tests: ['Comprehensive fever screening', 'Complete Blood Count', 'ESR', 'CRP', 'Dengue NS1', 'Malaria Antigen', 'Typhoid IgM'],
-    icon: '🌡️',
+    color: '#EA580C',
+    badge: 'FC',
     description: 'Comprehensive fever screening covering Dengue, Malaria, and Typhoid screening with inflammation markers'
   },
   {
@@ -118,7 +127,8 @@ const PACKAGES = [
     category: 'Fever Screening',
     parameters: 14,
     tests: ['Standard fever screen', 'Covering Dengue NS1', 'Malaria Antigen', 'Widal', 'CBC', 'ESR', 'Urine Routine'],
-    icon: '🏥',
+    color: '#F59E0B',
+    badge: 'FS',
     description: 'Standard fever screening covering common fever-causing pathogens with routine blood tests'
   }
 ]
@@ -288,7 +298,23 @@ export default function Laboratory() {
                           {pkg.parameters} Parameters
                         </div>
 
-                        <div style={{ fontSize: '32px', marginBottom: '12px' }}>{pkg.icon}</div>
+                        {/* Professional Color Badge */}
+                        <div style={{
+                          width: '60px',
+                          height: '60px',
+                          borderRadius: '12px',
+                          background: selectedPackage?.id === pkg.id ? pkg.color : pkg.color + '15',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginBottom: '16px',
+                          fontWeight: '700',
+                          fontSize: '20px',
+                          color: selectedPackage?.id === pkg.id ? '#fff' : pkg.color,
+                          transition: 'all 0.3s'
+                        }}>
+                          {pkg.badge}
+                        </div>
                         <h4 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>
                           {pkg.name}
                         </h4>
@@ -370,7 +396,13 @@ export default function Laboratory() {
                     onChange={() => {}}
                     style={{ marginBottom: '8px', cursor: 'pointer' }}
                   />
-                  <div style={{ fontSize: '24px', marginBottom: '8px' }}>{test.icon}</div>
+                  <div style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: test.color,
+                    marginBottom: '12px'
+                  }}></div>
                   <h5 style={{ fontSize: '14px', fontWeight: '700', color: '#0A1628', marginBottom: '6px' }}>
                     {test.name}
                   </h5>
