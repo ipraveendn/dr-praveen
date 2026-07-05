@@ -745,10 +745,21 @@ export default function Laboratory() {
                   border: '1px solid #E2EEEC',
                   transition: 'all 0.3s'
                 }}>
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    margin: '0 auto 18px',
+                    borderRadius: '14px',
+                    background: '#E6F4F2',
+                    display: 'grid',
+                    placeItems: 'center'
+                  }}>
+                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#0B7B6F' }} />
+                  </div>
                   <h4 style={{ fontSize: '14px', fontWeight: '700', color: '#0A1628', marginBottom: '12px', letterSpacing: '0.5px' }}>
                     {benefit.title}
                   </h4>
-                  <p style={{ fontSize: '13px', color: '#64748B' }}>{benefit.desc}</p>
+                  <p style={{ fontSize: '13px', color: '#64748B', lineHeight: '1.8' }}>{benefit.desc}</p>
                 </div>
               ))}
             </div>
@@ -784,12 +795,16 @@ export default function Laboratory() {
                   padding: '20px',
                   border: '1px solid #E2EEEC'
                 }}>
-                  <h4 style={{ fontSize: '16px', fontWeight: '700', color: '#0A1628', marginBottom: '12px' }}>
+                  <div style={{ width: '48px', height: '4px', background: '#0B7B6F', borderRadius: '999px', marginBottom: '16px' }} />
+                  <h4 style={{ fontSize: '16px', fontWeight: '700', color: '#0A1628', marginBottom: '16px' }}>
                     {section.title}
                   </h4>
-                  <ul style={{ fontSize: '13px', color: '#64748B', lineHeight: '1.8', paddingLeft: '18px' }}>
+                  <ul style={{ fontSize: '13px', color: '#64748B', lineHeight: '1.8', paddingLeft: '0' }}>
                     {section.tips.map((tip, j) => (
-                      <li key={j} style={{ marginBottom: '6px' }}>{tip}</li>
+                      <li key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '10px' }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0B7B6F', marginTop: '6px', flexShrink: 0 }} />
+                        <span>{tip}</span>
+                      </li>
                     ))}
                   </ul>
                 </div>
