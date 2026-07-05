@@ -712,54 +712,78 @@ export default function Laboratory() {
         </section>
 
         {/* WHY CHOOSE US */}
-        <section style={{ padding: '60px 5%', background: '#F8FAFA' }}>
+        <section style={{ padding: '70px 5%', background: 'linear-gradient(180deg, #F8FAFA 0%, #F4FBFA 100%)' }}>
           <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-            <h2 style={{
-              fontFamily: "'Cormorant Garamond',serif",
-              fontSize: '32px',
-              textAlign: 'center',
-              marginBottom: '48px',
-              color: '#0A1628'
-            }}>
-              Why Choose <em style={{ color: '#0B7B6F' }}>Our Laboratory</em>
-            </h2>
+            <div style={{ textAlign: 'center', maxWidth: '720px', margin: '0 auto 40px' }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 14px',
+                borderRadius: '999px',
+                background: 'rgba(11, 123, 111, 0.10)',
+                color: '#0B7B6F',
+                fontSize: '13px',
+                fontWeight: '700',
+                letterSpacing: '0.5px',
+                textTransform: 'uppercase',
+                marginBottom: '14px'
+              }}>
+                Trusted diagnostics, delivered with care
+              </div>
+              <h2 style={{
+                fontFamily: "'Cormorant Garamond',serif",
+                fontSize: '32px',
+                marginBottom: '12px',
+                color: '#0A1628'
+              }}>
+                Why Choose <em style={{ color: '#0B7B6F' }}>Our Laboratory</em>
+              </h2>
+              <p style={{ fontSize: '15px', lineHeight: '1.8', color: '#64748B' }}>
+                Precision-led testing, professional support, and a seamless experience from booking to report delivery.
+              </p>
+            </div>
 
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-              gap: '24px'
+              gap: '22px'
             }}>
               {[
-                { title: 'NABL Accredited', desc: 'Certified laboratory with quality standards' },
-                { title: 'Doctor Supervised', desc: 'Reports interpreted by Dr. Praveen' },
-                { title: 'Home Collection', desc: 'Sample collected at your doorstep' },
-                { title: 'Fast Reports', desc: '24-48 hours turnaround time' },
-                { title: 'Secure Reports', desc: 'Online portal with encrypted access' },
-                { title: 'Affordable Rates', desc: 'Best prices on all diagnostic tests' },
+                { title: 'NABL Accredited', desc: 'Certified laboratory processes that meet strict quality benchmarks.' },
+                { title: 'Doctor Supervised', desc: 'Reports are reviewed and interpreted with clinical guidance.' },
+                { title: 'Home Collection', desc: 'Convenient sample pickup at your doorstep with minimal effort.' },
+                { title: 'Fast Reports', desc: 'Reliable turnaround time so you receive results promptly.' },
+                { title: 'Secure Reports', desc: 'Encrypted access and privacy-focused report delivery.' },
+                { title: 'Affordable Rates', desc: 'Competitive pricing with transparent diagnostics packages.' },
               ].map((benefit, i) => (
                 <div key={i} style={{
                   background: '#fff',
-                  borderRadius: '12px',
+                  borderRadius: '16px',
                   padding: '24px',
-                  textAlign: 'center',
-                  border: '1px solid #E2EEEC',
-                  transition: 'all 0.3s'
+                  textAlign: 'left',
+                  border: '1px solid rgba(11, 123, 111, 0.12)',
+                  boxShadow: '0 12px 30px rgba(10, 22, 40, 0.05)',
+                  transition: 'transform 0.25s ease, box-shadow 0.25s ease'
                 }}>
                   <div style={{
-                    width: '40px',
-                    height: '40px',
-                    margin: '0 auto 18px',
+                    width: '44px',
+                    height: '44px',
+                    marginBottom: '16px',
                     borderRadius: '14px',
-                    background: '#E6F4F2',
+                    background: 'linear-gradient(135deg, #E6F4F2 0%, #D7EFE9 100%)',
                     display: 'grid',
-                    placeItems: 'center'
+                    placeItems: 'center',
+                    color: '#0B7B6F',
+                    fontWeight: '800',
+                    fontSize: '16px'
                   }}>
-                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#0B7B6F' }} />
+                    {i + 1}
                   </div>
-                  <h4 style={{ fontSize: '14px', fontWeight: '700', color: '#0A1628', marginBottom: '12px', letterSpacing: '0.5px' }}>
+                  <h4 style={{ fontSize: '15px', fontWeight: '700', color: '#0A1628', marginBottom: '10px', letterSpacing: '0.3px' }}>
                     {benefit.title}
                   </h4>
-                  <p style={{ fontSize: '13px', color: '#64748B', lineHeight: '1.8' }}>{benefit.desc}</p>
+                  <p style={{ fontSize: '14px', color: '#64748B', lineHeight: '1.8', margin: 0 }}>{benefit.desc}</p>
                 </div>
               ))}
             </div>
@@ -767,42 +791,88 @@ export default function Laboratory() {
         </section>
 
         {/* TEST PREPARATION TIPS */}
-        <section style={{ padding: '60px 5%', background: '#fff' }}>
+        <section style={{ padding: '70px 5%', background: '#fff' }}>
           <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-            <h2 style={{
-              fontFamily: "'Cormorant Garamond',serif",
-              fontSize: '32px',
-              marginBottom: '36px',
-              color: '#0A1628'
-            }}>
-              Test Preparation <em style={{ color: '#0B7B6F' }}>Tips</em>
-            </h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '20px', marginBottom: '36px', flexWrap: 'wrap' }}>
+              <div style={{ maxWidth: '680px' }}>
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 14px',
+                  borderRadius: '999px',
+                  background: 'rgba(11, 123, 111, 0.10)',
+                  color: '#0B7B6F',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  letterSpacing: '0.5px',
+                  textTransform: 'uppercase',
+                  marginBottom: '12px'
+                }}>
+                  Simple steps, better results
+                </div>
+                <h2 style={{
+                  fontFamily: "'Cormorant Garamond',serif",
+                  fontSize: '32px',
+                  margin: 0,
+                  color: '#0A1628'
+                }}>
+                  Test Preparation <em style={{ color: '#0B7B6F' }}>Tips</em>
+                </h2>
+              </div>
+              <div style={{
+                padding: '12px 16px',
+                borderRadius: '12px',
+                background: '#F8FAFA',
+                color: '#0B7B6F',
+                fontSize: '14px',
+                fontWeight: '600',
+                border: '1px solid #E2EEEC'
+              }}>
+                Follow these to keep your test smooth and accurate.
+              </div>
+            </div>
 
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '24px'
+              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+              gap: '22px'
             }}>
               {[
-                { title: 'Night Before', tips: ['Get 8 hours sleep', 'Avoid alcohol', 'Eat a light dinner'] },
+                { title: 'Night Before', tips: ['Get 8 hours of sleep', 'Avoid alcohol', 'Eat a light dinner'] },
                 { title: 'Morning of Test', tips: ['Fast for 8-10 hours', 'Drink plain water', 'Wear loose sleeves'] },
                 { title: 'After Collection', tips: ['Have a light breakfast', 'Drink plenty of water', 'Rest for 15 minutes'] },
-                { title: 'Important Notes', tips: ['Bring doctor note if any', 'List current medicines', 'Inform about allergies'] },
+                { title: 'Important Notes', tips: ['Bring any doctor note', 'List current medicines', 'Inform us about allergies'] },
               ].map((section, i) => (
                 <div key={i} style={{
                   background: '#F8FAFA',
-                  borderRadius: '12px',
-                  padding: '20px',
-                  border: '1px solid #E2EEEC'
+                  borderRadius: '16px',
+                  padding: '24px',
+                  border: '1px solid #E2EEEC',
+                  boxShadow: '0 10px 24px rgba(10, 22, 40, 0.04)'
                 }}>
-                  <div style={{ width: '48px', height: '4px', background: '#0B7B6F', borderRadius: '999px', marginBottom: '16px' }} />
-                  <h4 style={{ fontSize: '16px', fontWeight: '700', color: '#0A1628', marginBottom: '16px' }}>
-                    {section.title}
-                  </h4>
-                  <ul style={{ fontSize: '13px', color: '#64748B', lineHeight: '1.8', paddingLeft: '0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                    <div style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '12px',
+                      background: 'linear-gradient(135deg, #0B7B6F 0%, #0A1628 100%)',
+                      display: 'grid',
+                      placeItems: 'center',
+                      color: '#fff',
+                      fontWeight: '700',
+                      fontSize: '14px'
+                    }}>
+                      {i + 1}
+                    </div>
+                    <h4 style={{ fontSize: '16px', fontWeight: '700', color: '#0A1628', margin: 0 }}>
+                      {section.title}
+                    </h4>
+                  </div>
+                  <ul style={{ fontSize: '14px', color: '#64748B', lineHeight: '1.8', paddingLeft: '0', margin: 0, listStyle: 'none' }}>
                     {section.tips.map((tip, j) => (
                       <li key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '10px' }}>
-                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0B7B6F', marginTop: '6px', flexShrink: 0 }} />
+                        <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#0B7B6F', marginTop: '7px', flexShrink: 0 }} />
                         <span>{tip}</span>
                       </li>
                     ))}
