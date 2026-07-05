@@ -45,206 +45,169 @@ export default function Pharmacy() {
 
         {/* MAIN CONTENT */}
         <section style={{ padding: '60px 5%', background: '#fff' }}>
-          <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-            
-            <div style={{ maxWidth: '900px', margin: '0 auto', padding: '40px 0' }}>
-              <div style={{
-                background: '#F8FAFA',
-                borderRadius: '24px',
-                border: '1px solid #E2EEEC',
-                padding: '40px'
-              }}>
+          <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+            <div style={{
+              background: 'linear-gradient(135deg, #F8FAFA 0%, #FFFFFF 100%)',
+              border: '1px solid #E2EEEC',
+              borderRadius: '24px',
+              padding: '40px',
+              boxShadow: '0 10px 30px rgba(10, 22, 40, 0.05)'
+            }}>
+              <div style={{ maxWidth: '760px', marginBottom: '32px' }}>
                 <h2 style={{
                   fontFamily: "'Cormorant Garamond',serif",
                   fontSize: '32px',
-                  marginBottom: '16px',
+                  marginBottom: '14px',
                   color: '#0A1628'
                 }}>
-                  Prescription-based home medicine delivery
+                  Reliable pharmacy service for your home
                 </h2>
                 <p style={{
                   color: '#64748B',
                   lineHeight: '1.8',
-                  marginBottom: '24px',
-                  fontSize: '15px'
+                  fontSize: '15px',
+                  margin: 0
                 }}>
-                  Upload your prescription or request medication customization. Our pharmacy team will review your request and arrange delivery of your medicines to your home.
+                  Upload your prescription or request medication customization. Our team will review your request and arrange delivery of your medicines to your home with care and discretion.
                 </p>
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1.1fr 0.9fr',
+                gap: '24px',
+                alignItems: 'stretch'
+              }}>
+                <div style={{
+                  background: '#fff',
+                  borderRadius: '20px',
+                  border: '1px solid #E2EEEC',
+                  padding: '28px'
+                }}>
+                  <h3 style={{ fontSize: '20px', marginBottom: '12px', color: '#0A1628', fontWeight: '700' }}>
+                    Upload prescription
+                  </h3>
+                  <p style={{ color: '#64748B', fontSize: '14px', lineHeight: '1.75', marginBottom: '18px' }}>
+                    Send a clear photo or PDF of your prescription and we will help prepare your medicine request for home delivery.
+                  </p>
+                  <input
+                    type="file"
+                    id="prescription-upload"
+                    accept="image/*,.pdf"
+                    onChange={(e) => setPrescription(e.target.files[0]?.name || null)}
+                    style={{ display: 'none' }}
+                  />
+                  <label htmlFor="prescription-upload" style={{
+                    display: 'inline-block',
+                    background: '#0B7B6F',
+                    color: '#fff',
+                    padding: '14px 24px',
+                    borderRadius: '12px',
+                    cursor: 'pointer',
+                    fontWeight: '700',
+                    fontSize: '14px'
+                  }}>
+                    Upload prescription
+                  </label>
+                  {prescription && (
+                    <div style={{
+                      marginTop: '16px',
+                      color: '#0A1628',
+                      fontSize: '14px',
+                      lineHeight: '1.6'
+                    }}>
+                      Selected file: {prescription}
+                    </div>
+                  )}
+                </div>
 
                 <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                  gap: '16px',
-                  marginBottom: '28px'
+                  background: '#fff',
+                  borderRadius: '20px',
+                  border: '1px solid #E2EEEC',
+                  padding: '28px'
                 }}>
-                  {[
-                    { title: 'Home delivery', text: 'Medicines delivered directly to your address.' },
-                    { title: 'Fast delivery', text: 'Quick support for urgent prescription needs.' },
-                    { title: 'Same-day service', text: 'Available after prescription review.' },
-                    { title: 'Flexible payment', text: 'Online and cash payment options available.' }
-                  ].map((item, index) => (
-                    <div key={index} style={{
-                      background: '#fff',
-                      borderRadius: '16px',
+                  <h3 style={{ fontSize: '20px', marginBottom: '12px', color: '#0A1628', fontWeight: '700' }}>
+                    Request customization
+                  </h3>
+                  <p style={{ color: '#64748B', fontSize: '14px', lineHeight: '1.75', marginBottom: '18px' }}>
+                    Mention your preferred brand, dosage, or any special instruction and our team will assist you.
+                  </p>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Add any instruction or request for home delivery"
+                    style={{
+                      width: '100%',
+                      minHeight: '120px',
+                      padding: '14px',
                       border: '1px solid #E2EEEC',
-                      padding: '20px'
-                    }}>
-                      <h3 style={{ fontSize: '16px', marginBottom: '8px', color: '#0A1628', fontWeight: '700' }}>
-                        {item.title}
-                      </h3>
-                      <p style={{ color: '#64748B', fontSize: '13px', lineHeight: '1.7', margin: 0 }}>
-                        {item.text}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-
-                <div style={{ display: 'grid', gap: '24px' }}>
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1.1fr 0.9fr',
-                    gap: '24px',
-                    alignItems: 'stretch'
-                  }}>
-                    <div style={{
-                      background: '#fff',
-                      borderRadius: '20px',
-                      border: '1px solid #E2EEEC',
-                      padding: '30px'
-                    }}>
-                      <h3 style={{ fontSize: '20px', marginBottom: '14px', color: '#0A1628', fontWeight: '700' }}>
-                        Upload prescription
-                      </h3>
-                      <p style={{ color: '#64748B', fontSize: '14px', lineHeight: '1.75', marginBottom: '22px' }}>
-                        Upload a clear photo or PDF of your prescription so our pharmacy team can verify it and prepare the delivery.
-                      </p>
-                      <input
-                        type="file"
-                        id="prescription-upload"
-                        accept="image/*,.pdf"
-                        onChange={(e) => setPrescription(e.target.files[0]?.name || null)}
-                        style={{ display: 'none' }}
-                      />
-                      <label htmlFor="prescription-upload" style={{
-                        display: 'inline-block',
-                        background: '#0B7B6F',
-                        color: '#fff',
-                        padding: '14px 26px',
-                        borderRadius: '12px',
-                        cursor: 'pointer',
-                        fontWeight: '700',
-                        fontSize: '14px'
-                      }}>
-                        Upload prescription
-                      </label>
-                      {prescription && (
-                        <div style={{
-                          marginTop: '18px',
-                          color: '#0A1628',
-                          fontSize: '14px',
-                          lineHeight: '1.6'
-                        }}>
-                          Selected file: {prescription}
-                        </div>
-                      )}
-                    </div>
-
-                    <div style={{
-                      background: '#fff',
-                      borderRadius: '20px',
-                      border: '1px solid #E2EEEC',
-                      padding: '30px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between'
-                    }}>
-                      <div>
-                        <h3 style={{ fontSize: '20px', marginBottom: '14px', color: '#0A1628', fontWeight: '700' }}>
-                          Request customization
-                        </h3>
-                        <p style={{ color: '#64748B', fontSize: '14px', lineHeight: '1.75', marginBottom: '16px' }}>
-                          Share your preferred brand, dosage requirement, or any special instruction and we will assist with the order.
-                        </p>
-                      </div>
-                      <div style={{ fontWeight: '700', color: '#0B7B6F', fontSize: '14px' }}>
-                        Need urgent help? Call the hospital at <a href="tel:08041675151" style={{ color: '#0B7B6F', textDecoration: 'none' }}>08041675151</a>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{
-                    background: '#fff',
-                    borderRadius: '20px',
-                    border: '1px solid #E2EEEC',
-                    padding: '30px'
-                  }}>
-                    <h3 style={{ fontSize: '20px', marginBottom: '14px', color: '#0A1628', fontWeight: '700' }}>
-                      Write a note
-                    </h3>
-                    <textarea
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Add any special instruction, preferred brand, or request for home delivery"
-                      style={{
-                        width: '100%',
-                        minHeight: '140px',
-                        padding: '18px',
-                        border: '1px solid #E2EEEC',
-                        borderRadius: '14px',
-                        fontSize: '14px',
-                        fontFamily: 'inherit',
-                        color: '#0A1628',
-                        resize: 'vertical'
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                    <button
-                      onClick={() => {
-                        setRequestError('')
-                        if (!prescription && !notes.trim()) {
-                          setRequestError('Please upload a prescription or provide a note for your request.')
-                          setRequestStatus('')
-                          return
-                        }
-                        setRequestStatus('Your request has been submitted. Our pharmacy team will contact you soon to arrange home delivery.')
-                      }}
-                      style={{
-                        background: '#0B7B6F',
-                        color: '#fff',
-                        border: 'none',
-                        padding: '14px 28px',
-                        borderRadius: '12px',
-                        fontWeight: '700',
-                        cursor: 'pointer',
-                        fontSize: '14px'
-                      }}
-                    >
-                      Submit request
-                    </button>
-                  </div>
-
-                  {requestError && (
-                    <div style={{ color: '#B91C1C', fontSize: '14px' }}>
-                      {requestError}
-                    </div>
-                  )}
-
-                  {requestStatus && (
-                    <div style={{
-                      padding: '18px',
-                      background: '#ECFDF5',
-                      border: '1px solid #A7F3D0',
-                      borderRadius: '14px',
-                      color: '#0B7B6F',
-                      fontSize: '14px'
-                    }}>
-                      {requestStatus}
-                    </div>
-                  )}
+                      borderRadius: '12px',
+                      fontSize: '14px',
+                      fontFamily: 'inherit',
+                      color: '#0A1628',
+                      resize: 'vertical',
+                      boxSizing: 'border-box'
+                    }}
+                  />
                 </div>
               </div>
+
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginTop: '24px',
+                gap: '12px',
+                flexWrap: 'wrap'
+              }}>
+                <div style={{ color: '#64748B', fontSize: '14px' }}>
+                  Home delivery • Fast delivery • Same-day availability • Online and cash payment
+                </div>
+                <button
+                  onClick={() => {
+                    setRequestError('')
+                    if (!prescription && !notes.trim()) {
+                      setRequestError('Please upload a prescription or provide a note for your request.')
+                      setRequestStatus('')
+                      return
+                    }
+                    setRequestStatus('Your request has been submitted. Our pharmacy team will contact you soon to arrange home delivery.')
+                  }}
+                  style={{
+                    background: '#0B7B6F',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '14px 24px',
+                    borderRadius: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  Submit request
+                </button>
+              </div>
+
+              {requestError && (
+                <div style={{ marginTop: '16px', color: '#B91C1C', fontSize: '14px' }}>
+                  {requestError}
+                </div>
+              )}
+
+              {requestStatus && (
+                <div style={{
+                  marginTop: '16px',
+                  padding: '16px',
+                  background: '#ECFDF5',
+                  border: '1px solid #A7F3D0',
+                  borderRadius: '12px',
+                  color: '#0B7B6F',
+                  fontSize: '14px'
+                }}>
+                  {requestStatus}
+                </div>
+              )}
             </div>
           </div>
         </section>
