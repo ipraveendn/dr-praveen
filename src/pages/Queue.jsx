@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import QRCode from 'qrcode'
 import { CLINICS, DOCTOR } from '../data/content'
 import { apiRequest } from '../utils/api'
 import SEOMeta from '../components/SEOMeta'
@@ -52,6 +53,9 @@ export default function Queue() {
   const [queueData, setQueueData] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [paymentScreenshot, setPaymentScreenshot] = useState(null)
+  const [qrCodeSrc, setQrCodeSrc] = useState('')
+  const [qrLoading, setQrLoading] = useState(false)
+  const [qrError, setQrError] = useState('')
 
   const UPI_PAYMENTS = {
     diaplus: {
@@ -64,11 +68,21 @@ export default function Queue() {
     }
   }
 
-  const getUpiQrUrl = (clinicId) => {
+  useEffect(() => {
+    const clinicId = clinic || 'diaplus'
     const payment = UPI_PAYMENTS[clinicId] || UPI_PAYMENTS.diaplus
     const upiData = `upi://pay?pa=${payment.pa}&pn=${encodeURIComponent(payment.pn)}&cu=INR`
-    return `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(upiData)}`
-  }
+
+    setQrLoading(true)
+    setQrError('')
+    QRCode.toDataURL(upiData, { width: 260, margin: 2 })
+      .then(setQrCodeSrc)
+      .catch(err => {
+        console.error('[QR CODE ERROR]', err)
+        setQrError('Unable to generate the QR code. Please refresh the page.')
+      })
+      .finally(() => setQrLoading(false))
+  }, [clinic])
 
   async function fetchQueueData() {
     try {
@@ -382,11 +396,17 @@ export default function Queue() {
 
                       <div style={{ display: 'grid', justifyItems: 'center', gap: '16px' }}>
                         <div style={{ width: '220px', height: '220px', borderRadius: '20px', background: '#fff', border: '1px solid #E2EEEC', display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
-                        <img
-                          src={getUpiQrUrl(clinicObj?.id)}
-                          alt={clinicObj?.id === 'thyroplus' ? 'ThyroPlus QR code' : 'DiaPlus QR code'}
-                          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                        />
+                        {qrLoading ? (
+                          <div style={{ color: '#64748B', fontSize: '13px', padding: '12px', textAlign: 'center' }}>Generating QR code...</div>
+                        ) : qrError ? (
+                          <div style={{ color: '#dc2626', fontSize: '13px', padding: '12px', textAlign: 'center' }}>{qrError}</div>
+                        ) : (
+                          <img
+                            src={qrCodeSrc}
+                            alt={clinicObj?.id === 'thyroplus' ? 'ThyroPlus QR code' : 'DiaPlus QR code'}
+                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                          />
+                        )}
                       </div>
                         <div style={{ textAlign: 'center' }}>
                           <div style={{ fontSize: '13px', color: '#0A1628', fontWeight: '700', marginBottom: '6px' }}>UPI ID</div>
