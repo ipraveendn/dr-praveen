@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { CLINICS, DOCTOR } from '../data/content'
 import { apiRequest } from '../utils/api'
-import { createPaymentOrder, verifyPayment, simulateRazorpayPayment } from '../utils/payment'
 import SEOMeta from '../components/SEOMeta'
 
 const REASONS = ['Diabetes Checkup','Thyroid Consultation','Hormone Imbalance','Obesity/Weight','PCOS / PCOD','Gestational Diabetes','Pediatric Endocrinology','Osteoporosis','Adrenal Disorder','Pituitary Disorder','General Consultation','Other']
@@ -51,10 +50,8 @@ export default function Queue() {
   const [loading, setLoading] = useState(false)
   const [error, setError]   = useState('')
   const [queueData, setQueueData] = useState(null);
-  
-  // Payment states
-  const [paymentOrder, setPaymentOrder] = useState(null)
-  const [paymentStatus, setPaymentStatus] = useState(null) // 'processing', 'success', 'failed'
+  const [paymentMethod, setPaymentMethod] = useState('cash')
+  const [paymentScreenshot, setPaymentScreenshot] = useState(null)
 
   async function fetchQueueData() {
     try {
@@ -85,76 +82,21 @@ export default function Queue() {
   /**
    * Create payment order before showing payment screen
    */
-  async function createOrder() {
+  async function proceedToPayment() {
     if (!form.name || !form.phone || !form.reason) { setError('Please fill all fields'); return }
     if (form.phone.length < 10) { setError('Enter a valid 10-digit phone number'); return }
-    
-    setLoading(true); setError('')
-    try {
-      const orderData = await createPaymentOrder(500) // ₹500 consultation fee
-      setPaymentOrder(orderData)
-      setStep(5) // Go to payment screen (moved one step due to consultation mode)
-    } catch (e) {
-      console.error('[CREATE ORDER ERROR]', e)
-      setError(e.message || 'Failed to create order. Please try again.')
-    }
-    setLoading(false)
+    setError('')
+    setStep(5)
   }
 
-  /**
-   * Simulate payment and verify with backend
-   */
-  async function processPayment() {
-    console.log('\n[PAYMENT FLOW] ===== STARTING PAYMENT PROCESS =====')
-    setPaymentStatus('processing')
-    setError('')
-    setLoading(true)
-    
-    try {
-      // Simulate Razorpay payment (1-2 second delay, 10% failure rate)
-      console.log('[PAYMENT FLOW] Step 1: Calling simulateRazorpayPayment()')
-      const paymentDetails = await simulateRazorpayPayment(paymentOrder.orderId)
-      console.log('[PAYMENT FLOW] Step 2: Payment simulation complete. Details:', paymentDetails)
-      
-      // Verify payment with backend
-      console.log('[PAYMENT FLOW] Step 3: Calling verifyPayment() with details:', paymentDetails)
-      const verifyResult = await verifyPayment(paymentDetails)
-      console.log('[PAYMENT FLOW] Step 4: Verify payment response:', verifyResult)
-      
-      if (verifyResult.success) {
-        console.log('[PAYMENT FLOW] Step 5: Payment verified successfully. Setting status to success.')
-        setPaymentStatus('success')
-        // Proceed to token generation after 1.5 second delay to show success message
-        console.log('[PAYMENT FLOW] Step 6: Scheduling generateToken() to run in 1500ms...')
-        const timeoutId = setTimeout(() => {
-          console.log('[PAYMENT FLOW] Step 7: Timeout fired! Calling generateToken() now.')
-          generateToken()
-        }, 1500)
-        console.log('[PAYMENT FLOW] Step 6b: Timeout scheduled with ID:', timeoutId)
-      } else {
-        console.error('[PAYMENT FLOW] Payment verification returned success=false:', verifyResult)
-        setPaymentStatus('failed')
-        setError(verifyResult.message || 'Payment verification failed. Please try again.')
-        setLoading(false)
-      }
-    } catch (e) {
-      console.error('[PAYMENT ERROR] Exception in processPayment():', e)
-      console.error('[PAYMENT ERROR] Error name:', e.name)
-      console.error('[PAYMENT ERROR] Error message:', e.message)
-      console.error('[PAYMENT ERROR] Error stack:', e.stack)
-      setPaymentStatus('failed')
-      setError(e.message || 'Payment processing failed. Please try again.')
-      setLoading(false)
-    }
+  function handleScreenshotSelect(event) {
+    const file = event.target.files?.[0]
+    if (file) setPaymentScreenshot(file)
   }
 
-  /**
-   * Retry failed payment
-   */
-  function retryPayment() {
-    setPaymentStatus(null)
-    setError('')
-    setLoading(false)
+  function isPaymentReady() {
+    if (paymentMethod === 'cash') return true
+    return paymentScreenshot !== null
   }
 
   /**
@@ -365,91 +307,108 @@ export default function Queue() {
                 {error && <p style={{ color: '#ef4444', fontSize: '13px', marginBottom: '12px' }}>⚠️ {error}</p>}
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <button onClick={() => setStep(3)} className="btn-secondary" style={{ flex: 1 }}>← Edit</button>
-                  <button onClick={createOrder} disabled={loading} className="btn-primary" style={{ flex: 2, opacity: loading ? 0.7 : 1 }}>
-                    {loading ? '⏳ Processing...' : ' Proceed to Payment'}
+                  <button onClick={proceedToPayment} className="btn-primary" style={{ flex: 2 }}>
+                    Proceed to Payment Options
                   </button>
                 </div>
               </div>
             )}
 
             {/* Step 5 — Payment */}
-            {step === 5 && paymentOrder && !token && (
+            {step === 5 && !token && (
               <div style={{ textAlign: 'center' }}>
                 <div style={{ marginBottom: '24px' }}>
-                  <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '26px', fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>Confirm Payment</h2>
-                  <p style={{ color: '#64748B', fontSize: '14px' }}>Consultation Fee</p>
+                  <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '26px', fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>Payment Options</h2>
+                  <p style={{ color: '#64748B', fontSize: '14px' }}>Choose how you would like to pay for your token.</p>
                 </div>
 
-                {/* Amount */}
-                <div style={{ background: '#F8FAFA', borderRadius: '14px', padding: '24px', marginBottom: '24px', border: '1px solid #E2EEEC' }}>
-                  <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '8px' }}>Amount to Pay</div>
-                  <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '48px', fontWeight: '800', color: '#0B7B6F', lineHeight: '1' }}>₹{paymentOrder.amount}</div>
-                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '8px' }}>Order ID: {paymentOrder.orderId}</div>
-                </div>
-
-                {/* Status Messages */}
-                {paymentStatus === 'processing' && (
-                  <div style={{ background: '#E6F4F2', borderRadius: '12px', padding: '20px', marginBottom: '24px', border: '1px solid #0B7B6F' }}>
-                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#0B7B6F', marginBottom: '8px' }}>⏳ Processing Payment...</div>
-                    <div style={{ fontSize: '12px', color: '#0A1628', marginBottom: '12px' }}>Securely processing your payment. Please do not close this page.</div>
-                    <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>
-                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#0B7B6F', animation: 'pulse 1.4s infinite' }} />
-                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#0B7B6F', animation: 'pulse 1.4s infinite 0.2s' }} />
-                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#0B7B6F', animation: 'pulse 1.4s infinite 0.4s' }} />
-                    </div>
-                    <style>{`
-                      @keyframes pulse {
-                        0%, 100% { opacity: 0.3; }
-                        50% { opacity: 1; }
-                      }
-                    `}</style>
-                  </div>
-                )}
-
-                {paymentStatus === 'success' && (
-                  <div style={{ background: '#E6F4F2', borderRadius: '12px', padding: '20px', marginBottom: '24px', border: '1px solid #0B7B6F' }}>
-                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#0B7B6F', marginBottom: '4px' }}>✓ Payment Successful!</div>
-                    <div style={{ fontSize: '12px', color: '#0A1628', marginTop: '4px' }}>Generating your token...</div>
-                  </div>
-                )}
-
-                {paymentStatus === 'failed' && (
-                  <div style={{ background: '#FEE2E2', borderRadius: '12px', padding: '20px', marginBottom: '24px', border: '1px solid #DC2626' }}>
-                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#DC2626', marginBottom: '4px' }}>✗ Payment Failed</div>
-                    <div style={{ fontSize: '12px', color: '#991B1B', marginTop: '4px', marginBottom: '12px' }}>{error || 'Payment could not be processed. Please try again.'}</div>
-                    <div style={{ fontSize: '11px', color: '#7F1D1D', fontStyle: 'italic' }}>This is a mock payment. In production, contact support if issues persist.</div>
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                {!paymentStatus && (
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <button onClick={() => { setStep(4); setPaymentOrder(null); }} className="btn-secondary" style={{ flex: 1 }}>← Cancel</button>
-                    <button onClick={processPayment} disabled={loading} className="btn-primary" style={{ flex: 2, opacity: loading ? 0.7 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}>
-                      {loading ? ' Processing...' : ' Pay Now'}
+                <div style={{ display: 'flex', gap: '14px', marginBottom: '24px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  {['cash', 'online'].map(method => (
+                    <button key={method}
+                      onClick={() => setPaymentMethod(method)}
+                      style={{
+                        flex: '1 1 180px',
+                        minWidth: '180px',
+                        padding: '18px 20px',
+                        borderRadius: '14px',
+                        border: paymentMethod === method ? '2px solid #0B7B6F' : '1px solid #E2EEEC',
+                        background: paymentMethod === method ? '#E6F4F2' : '#fff',
+                        color: '#0A1628',
+                        cursor: 'pointer',
+                        fontWeight: '700'
+                      }}
+                    >
+                      {method === 'cash' ? 'Pay Cash' : 'Pay Online'}
                     </button>
+                  ))}
+                </div>
+
+                {paymentMethod === 'cash' && (
+                  <div style={{ background: '#F8FAFA', borderRadius: '16px', padding: '24px', border: '1px solid #E2EEEC', marginBottom: '24px' }}>
+                    <p style={{ fontSize: '14px', color: '#0A1628', fontWeight: '700', marginBottom: '12px' }}>Pay at the clinic</p>
+                    <p style={{ fontSize: '14px', color: '#64748B', lineHeight: '1.7', margin: 0 }}>Please pay cash at reception when you arrive for your appointment.</p>
                   </div>
                 )}
 
-                {paymentStatus === 'failed' && (
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <button onClick={() => { setStep(4); setPaymentOrder(null); setPaymentStatus(null); }} className="btn-secondary" style={{ flex: 1 }}>← Back</button>
-                    <button onClick={retryPayment} className="btn-primary" style={{ flex: 2 }}>Retry Payment</button>
+                {paymentMethod === 'online' && (
+                  <div style={{ textAlign: 'left', marginBottom: '24px' }}>
+                    <div style={{ background: '#fff', borderRadius: '18px', padding: '24px', border: '1px solid #E2EEEC', marginBottom: '20px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', gap: '12px', flexWrap: 'wrap' }}>
+                        <div>
+                          <div style={{ fontSize: '14px', color: '#0B7B6F', fontWeight: '700', marginBottom: '6px' }}>Scan with any UPI app</div>
+                          <div style={{ fontSize: '13px', color: '#64748B', lineHeight: '1.7' }}>Use the QR code below to pay online for your token.</div>
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#64748B', padding: '8px 12px', background: '#F8FAFA', borderRadius: '12px', border: '1px solid #E2EEEC' }}>
+                          {clinicObj?.id === 'thyroplus' ? 'ThyroPlus QR' : 'DiaPlus QR'}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'grid', justifyItems: 'center', gap: '16px' }}>
+                        <div style={{ width: '220px', height: '220px', borderRadius: '20px', background: '#F8FAFA', border: '1px dashed #CBD5E1', display: 'grid', placeItems: 'center', color: '#64748B', fontSize: '13px', padding: '16px', textAlign: 'center' }}>
+                          {clinicObj?.id === 'thyroplus'
+                            ? 'ThyroPlus QR image goes here'
+                            : 'DiaPlus QR image goes here'}
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: '13px', color: '#0A1628', fontWeight: '700', marginBottom: '6px' }}>UPI ID</div>
+                          <div style={{ fontSize: '14px', color: '#0B7B6F', fontWeight: '700' }}>
+                            {clinicObj?.id === 'thyroplus'
+                              ? 'BHARATPE09895931868@yesbankltd'
+                              : 'paytmqr64bh34@ptys'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#0B7B6F', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Upload payment screenshot *</label>
+                      <input type="file" accept="image/*" onChange={handleScreenshotSelect}
+                        style={{ width: '100%', padding: '10px', borderRadius: '12px', border: '1px solid #E2EEEC', background: '#fff' }}
+                      />
+                    </div>
+                    {paymentScreenshot && (
+                      <div style={{ background: '#F8FAFA', borderRadius: '14px', padding: '16px', border: '1px solid #E2EEEC', color: '#0A1628' }}>
+                        <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '8px' }}>Screenshot ready</div>
+                        <div style={{ fontSize: '13px', color: '#64748B' }}>{paymentScreenshot.name}</div>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {paymentStatus === 'processing' && (
-                  <div style={{ textAlign: 'center', color: '#64748B', fontSize: '13px', padding: '16px' }}>
-                    <p>Your payment is being processed securely...</p>
-                    <p style={{ fontSize: '11px', marginTop: '8px', fontStyle: 'italic' }}>This may take a few moments</p>
-                  </div>
-                )}
-
-                {paymentStatus === 'success' && (
-                  <div style={{ textAlign: 'center', color: '#0B7B6F', fontSize: '13px', padding: '16px' }}>
-                    <p>Your payment has been confirmed. Creating your token...</p>
-                  </div>
-                )}
+                {error && <p style={{ color: '#ef4444', fontSize: '13px', marginBottom: '12px' }}>⚠️ {error}</p>}
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button onClick={() => setStep(4)} className="btn-secondary" style={{ flex: 1 }}>← Back</button>
+                  <button onClick={() => {
+                    if (paymentMethod === 'online' && !paymentScreenshot) {
+                      setError('Please upload your payment screenshot to confirm online payment.')
+                      return
+                    }
+                    setError('')
+                    generateToken()
+                  }} className="btn-primary" style={{ flex: 2, opacity: isPaymentReady() ? 1 : 0.65, cursor: isPaymentReady() ? 'pointer' : 'not-allowed' }}>
+                    Confirm Booking
+                  </button>
+                </div>
               </div>
             )}
 
@@ -466,7 +425,7 @@ export default function Queue() {
                   <p style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>Your token number and live tracking link have been sent.</p>
                 </div>
                 <a href={`/track?phone=${form.phone}`} className="btn-primary" style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px', textDecoration: 'none' }}> Track My Position Live</a>
-                <button onClick={() => { setStep(1); setToken(null); setPaymentOrder(null); setPaymentStatus(null); setForm({ name:'',phone:'',doctor:'Dr. Praveen Ramachandra',reason:'',email:'',place:'' }); setClinic(''); setConsultationMode(''); }} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '13px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Book Another Token</button>
+                <button onClick={() => { setStep(1); setToken(null); setPaymentMethod('cash'); setPaymentScreenshot(null); setForm({ name:'',phone:'',doctor:'Dr. Praveen Ramachandra',reason:'',email:'',place:'' }); setClinic(''); setConsultationMode(''); }} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '13px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Book Another Token</button>
               </div>
             )}
           </div>
