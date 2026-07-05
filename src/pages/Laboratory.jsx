@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { Link } from 'react-router-dom'
 
+// Individual Tests
 const TESTS = [
   { id: 1, name: 'Fasting Blood Sugar', price: 250, time: '2 hours', icon: '🩸' },
   { id: 2, name: 'HbA1c Test', price: 400, time: '24 hours', icon: '📊' },
@@ -13,34 +14,112 @@ const TESTS = [
   { id: 8, name: 'Vitamin D Test', price: 350, time: '48 hours', icon: '☀️' },
 ]
 
+// DiaplusKavach Packages organized by category
 const PACKAGES = [
+  // Specialized Endocrinology & Metabolic Packages
   {
     id: 1,
-    name: 'Health Check-up Basic',
-    price: 1200,
-    tests: ['FBS', 'Lipid Profile', 'Liver Function'],
-    icon: '💚'
+    name: 'DiaplusKavach Diabetes Gold',
+    price: 1600,
+    category: 'Specialized Endocrinology',
+    parameters: 42,
+    tests: ['HbA1c', 'TSH Ultra-Sensitive', 'Fasting Blood Sugar (FBS)', 'Cholesterol Total', 'Creatinine', 'CBC', 'Urine Examination'],
+    icon: '🩺',
+    description: 'A targeted screen for diabetes management including blood sugar, thyroid, and metabolic markers'
   },
   {
     id: 2,
-    name: 'Diabetes Complete',
-    price: 1800,
-    tests: ['FBS', 'HbA1c', 'Lipid Profile', 'Kidney Function'],
-    icon: '💪'
+    name: 'DiaplusKavach Thyroid Package',
+    price: 2550,
+    category: 'Specialized Endocrinology',
+    parameters: 5,
+    tests: ['Anti TPO', 'TSH Receptor Antibody', 'Thyroid Profile (T3, T4, TSH)'],
+    icon: '⚗️',
+    description: 'Advanced thyroid markers including Anti TPO and TSH Receptor Antibody for comprehensive thyroid evaluation'
   },
   {
     id: 3,
-    name: 'Thyroid Complete',
-    price: 1500,
-    tests: ['TSH', 'T3', 'T4', 'Thyroid Antibodies'],
-    icon: '🌟'
+    name: 'DiaplusKavach Yuvarogya Female',
+    price: 3250,
+    category: 'Specialized Endocrinology',
+    parameters: 69,
+    tests: ['AMH (Anti-Müllerian Hormone)', 'Cortisol (Morning sample)', 'Iron Studies', 'Vitamin D', 'Vitamin B12', 'Thyroid (T3, T4, TSH)', 'LFT', 'KFT', 'Lipid Profile', 'FBS', 'CBC', 'Urine Routine'],
+    icon: '👩‍⚕️',
+    description: 'Comprehensive hormonal profile for women featuring AMH, Cortisol, and essential micronutrient analysis'
   },
+
+  // Wellness & Family Packages
   {
     id: 4,
-    name: 'Annual Health Pack',
-    price: 2500,
-    tests: ['All routine tests', 'Vitamin D', 'Hormone panel', 'Complete Blood Count'],
-    icon: '👑'
+    name: 'DiaplusKavach Health Check-up Master',
+    price: 2640,
+    category: 'Wellness & Family',
+    parameters: 67,
+    tests: ['Vitamin D', 'B12', 'Thyroid (T3, T4, TSH)', 'HbA1c', 'Lipid Profile', 'KFT', 'LFT', 'CBC', 'Urine Routine', 'Fasting Blood Sugar'],
+    icon: '✨',
+    description: 'A full-body screen including vitamin levels, thyroid, and complete metabolic panel'
+  },
+  {
+    id: 5,
+    name: 'DiaplusKavach Complete Wellness Package',
+    price: 1750,
+    category: 'Wellness & Family',
+    parameters: 53,
+    tests: ['Complete Wellness Screening', 'TSH', 'Lipid Profile', 'KFT', 'LFT', 'CBC', 'Urine Routine', 'FBS'],
+    icon: '💚',
+    description: 'Extended wellness screening covering thyroid, and body screen including vitamin D for two'
+  },
+  {
+    id: 6,
+    name: 'DiaplusKavach Total Care',
+    price: 2550,
+    category: 'Wellness & Family',
+    parameters: 71,
+    tests: ['Extensive wellness screening', 'TSH', 'Lipid Profile', 'KFT', 'LFT', 'CBC', 'Urine Routine', 'FBS', 'Ovarian Marker', 'Iron Studies', 'Calcium'],
+    icon: '👑',
+    description: 'Comprehensive package for two with extended parameter coverage for complete health assessment'
+  },
+
+  // Specialized Care & Fever Screening
+  {
+    id: 7,
+    name: 'DiaplusKavach HeartCare',
+    price: 1550,
+    category: 'Specialized Care',
+    parameters: 12,
+    tests: ['Advanced cardiac screening', 'Apolipoprotein A1', 'Apolipoprotein B', 'AB Ratio', 'Lipid Profile', 'FBS', 'HsCRP'],
+    icon: '❤️',
+    description: 'Advanced cardiac screening including Apolipoprotein A1 and AB Ratio for heart health'
+  },
+  {
+    id: 8,
+    name: 'DiaplusKavach Anemia Package',
+    price: 1350,
+    category: 'Specialized Care',
+    parameters: 40,
+    tests: ['HB Electrophoresis', 'Iron Studies', 'Ferritin', 'Folic Acid', 'Vitamin B12', 'CBC'],
+    icon: '🩸',
+    description: 'Includes HB Electrophoresis and comprehensive iron studies for anemia diagnosis'
+  },
+  {
+    id: 9,
+    name: 'DiaplusKavach Fever Check Gold',
+    price: 2450,
+    category: 'Fever Screening',
+    parameters: 45,
+    tests: ['Comprehensive fever screening', 'Complete Blood Count', 'ESR', 'CRP', 'Dengue NS1', 'Malaria Antigen', 'Typhoid IgM'],
+    icon: '🌡️',
+    description: 'Comprehensive fever screening covering Dengue, Malaria, and Typhoid screening with inflammation markers'
+  },
+  {
+    id: 10,
+    name: 'DiaplusKavach Fever Screen',
+    price: 1150,
+    category: 'Fever Screening',
+    parameters: 14,
+    tests: ['Standard fever screen', 'Covering Dengue NS1', 'Malaria Antigen', 'Widal', 'CBC', 'ESR', 'Urine Routine'],
+    icon: '🏥',
+    description: 'Standard fever screening covering common fever-causing pathogens with routine blood tests'
   }
 ]
 
@@ -122,54 +201,127 @@ export default function Laboratory() {
             <h2 style={{
               fontFamily: "'Cormorant Garamond',serif",
               fontSize: '32px',
-              marginBottom: '36px',
+              marginBottom: '48px',
               color: '#0A1628'
             }}>
-              Popular <em style={{ color: '#0B7B6F' }}>Packages</em>
+              DiaplusKavach <em style={{ color: '#0B7B6F' }}>Diagnostic Packages</em>
             </h2>
 
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-              gap: '20px',
-              marginBottom: '60px'
-            }}>
-              {PACKAGES.map(pkg => (
-                <div 
-                  key={pkg.id}
-                  onClick={() => selectPackage(pkg)}
-                  style={{
-                    background: selectedPackage?.id === pkg.id ? 'linear-gradient(135deg,#0B7B6F,#096358)' : '#f8fafa',
-                    borderRadius: '16px',
-                    padding: '28px',
-                    border: selectedPackage?.id === pkg.id ? '2px solid #0B7B6F' : '1px solid #E2EEEC',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s',
-                    color: selectedPackage?.id === pkg.id ? '#fff' : '#0A1628'
-                  }}
-                >
-                  <div style={{ fontSize: '32px', marginBottom: '12px' }}>{pkg.icon}</div>
-                  <h4 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '12px' }}>
-                    {pkg.name}
-                  </h4>
+            {/* Group packages by category */}
+            {['Specialized Endocrinology', 'Wellness & Family', 'Specialized Care', 'Fever Screening'].map((category) => {
+              const categoryPackages = PACKAGES.filter(pkg => pkg.category === category)
+              return categoryPackages.length > 0 ? (
+                <div key={category} style={{ marginBottom: '60px' }}>
+                  {/* Category Heading */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    marginBottom: '32px',
+                    paddingBottom: '16px',
+                    borderBottom: '2px solid #0B7B6F'
+                  }}>
+                    <div style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: '#0B7B6F'
+                    }}></div>
+                    <h3 style={{
+                      fontFamily: "'Cormorant Garamond',serif",
+                      fontSize: '24px',
+                      fontWeight: '600',
+                      color: '#0B7B6F'
+                    }}>
+                      {category}
+                    </h3>
+                  </div>
+
+                  {/* Category Description */}
                   <p style={{
-                    fontSize: '12px',
-                    color: selectedPackage?.id === pkg.id ? 'rgba(255,255,255,0.8)' : '#94A3B8',
-                    marginBottom: '16px',
+                    fontSize: '14px',
+                    color: '#64748B',
+                    marginBottom: '28px',
                     lineHeight: '1.6'
                   }}>
-                    {pkg.tests.join(' • ')}
+                    {category === 'Specialized Endocrinology' && 'Tailored for hormonal and metabolic health. These packages are designed for your clinic\'s core focus on hormonal and metabolic health.'}
+                    {category === 'Wellness & Family' && 'Comprehensive wellness screening and preventative care packages for general health screening and family health management.'}
+                    {category === 'Specialized Care' && 'Specialized diagnostic packages for cardiac, anemic, and other specific health concerns with targeted screening.'}
+                    {category === 'Fever Screening' && 'Comprehensive fever screening packages covering common fever-causing pathogens with inflammation and infection markers.'}
                   </p>
-                  <p style={{
-                    fontSize: '24px',
-                    fontWeight: '700',
-                    color: selectedPackage?.id === pkg.id ? '#fff' : '#0B7B6F'
+
+                  {/* Packages Grid */}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                    gap: '24px',
+                    marginBottom: '20px'
                   }}>
-                    ₹{pkg.price}
-                  </p>
+                    {categoryPackages.map(pkg => (
+                      <div 
+                        key={pkg.id}
+                        onClick={() => selectPackage(pkg)}
+                        style={{
+                          background: selectedPackage?.id === pkg.id ? 'linear-gradient(135deg,#0B7B6F,#096358)' : '#f8fafa',
+                          borderRadius: '16px',
+                          padding: '28px',
+                          border: selectedPackage?.id === pkg.id ? '2px solid #0B7B6F' : '1px solid #E2EEEC',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s',
+                          color: selectedPackage?.id === pkg.id ? '#fff' : '#0A1628',
+                          position: 'relative'
+                        }}
+                      >
+                        {/* Package Badge */}
+                        <div style={{
+                          position: 'absolute',
+                          top: '12px',
+                          right: '12px',
+                          background: selectedPackage?.id === pkg.id ? 'rgba(255,255,255,0.2)' : '#E6F4F2',
+                          color: selectedPackage?.id === pkg.id ? '#fff' : '#0B7B6F',
+                          padding: '4px 10px',
+                          borderRadius: '20px',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          letterSpacing: '0.5px'
+                        }}>
+                          {pkg.parameters} Parameters
+                        </div>
+
+                        <div style={{ fontSize: '32px', marginBottom: '12px' }}>{pkg.icon}</div>
+                        <h4 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>
+                          {pkg.name}
+                        </h4>
+                        <p style={{
+                          fontSize: '13px',
+                          color: selectedPackage?.id === pkg.id ? 'rgba(255,255,255,0.7)' : '#64748B',
+                          marginBottom: '16px',
+                          lineHeight: '1.5',
+                          minHeight: '40px'
+                        }}>
+                          {pkg.description}
+                        </p>
+                        <p style={{
+                          fontSize: '12px',
+                          color: selectedPackage?.id === pkg.id ? 'rgba(255,255,255,0.8)' : '#94A3B8',
+                          marginBottom: '16px',
+                          lineHeight: '1.6'
+                        }}>
+                          {pkg.tests.join(' • ')}
+                        </p>
+                        <p style={{
+                          fontSize: '28px',
+                          fontWeight: '700',
+                          color: selectedPackage?.id === pkg.id ? '#fff' : '#0B7B6F'
+                        }}>
+                          ₹{pkg.price}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
-            </div>
+              ) : null
+            })}
 
             {/* OR DIVIDER */}
             <div style={{
