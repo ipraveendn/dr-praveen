@@ -41,6 +41,9 @@ function isBucketMissingError(error) {
 export const submitRequest = async (req, res) => {
   const customization = (req.body.customization || '').trim()
   const file = req.file
+  console.log('STEP 1 - Request received')
+  console.log('[pharmacy][debug] file present:', !!file)
+  console.log('[pharmacy][debug] customization present:', !!customization)
 
   if (!file && !customization) {
     return res.status(400).json({
@@ -54,6 +57,11 @@ export const submitRequest = async (req, res) => {
   try {
     if (file) {
       const supabase = getSupabaseClient()
+      console.log('STEP 2 - Supabase client initialized')
+      console.log('[pharmacy][debug] getSupabaseClient() returned null:', supabase === null)
+      console.log('[pharmacy][debug] SUPABASE_URL exists:', !!process.env.SUPABASE_URL)
+      console.log('[pharmacy][debug] SUPABASE_SERVICE_ROLE_KEY exists:', !!process.env.SUPABASE_SERVICE_ROLE_KEY)
+      console.log('[pharmacy][debug] bucket name:', BUCKET)
       if (!supabase) {
         return res.status(500).json({
           success: false,
@@ -69,16 +77,28 @@ export const submitRequest = async (req, res) => {
       }
 
       prescriptionPath = buildStoragePath(file.originalname)
+      console.log('[pharmacy][debug] storage path:', prescriptionPath)
 
-      const { error: uploadError } = await supabase.storage
-        .from(BUCKET)
-        .upload(prescriptionPath, file.buffer, {
-          contentType: file.mimetype,
-          upsert: false,
-        })
+      console.log('STEP 3 - Starting Storage upload')
+      let uploadError = null
+      try {
+        const uploadResult = await supabase.storage
+          .from(BUCKET)
+          .upload(prescriptionPath, file.buffer, {
+            contentType: file.mimetype,
+            upsert: false,
+          })
+        uploadError = uploadResult.error
+        console.log('STEP 4 - Storage upload completed')
+      } catch (uploadException) {
+        console.error('[pharmacy][debug] Storage upload threw exception:')
+        console.dir(uploadException, { depth: null })
+        throw uploadException
+      }
 
       if (uploadError) {
         console.error('[pharmacy] Storage upload failed:', uploadError)
+        console.dir(uploadError, { depth: null })
 
         if (isBucketMissingError(uploadError)) {
           return res.status(500).json({
@@ -94,6 +114,7 @@ export const submitRequest = async (req, res) => {
       }
     }
 
+    console.log('STEP 5 - Saving to PostgreSQL')
     await prisma.pharmacyRequest.create({
       data: {
         prescriptionPath,
@@ -101,6 +122,7 @@ export const submitRequest = async (req, res) => {
         status: 'Pending',
       },
     })
+    console.log('STEP 6 - Database insert completed')
 
     return res.status(201).json({
       success: true,
@@ -108,6 +130,7 @@ export const submitRequest = async (req, res) => {
     })
   } catch (error) {
     console.error('[pharmacy] Submit request failed:', error)
+    console.dir(error, { depth: null })
 
     return res.status(500).json({
       success: false,
