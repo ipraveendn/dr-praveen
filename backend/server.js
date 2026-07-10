@@ -10,6 +10,7 @@ import authRoutes from './routes/auth.js'
 import queueRoutes from './routes/queue.js'
 import paymentRoutes from './routes/payment.js'
 import notificationRoutes from './routes/notifications.js'
+import pharmacyRoutes from './routes/pharmacy.js'
 
 // Get current directory for ES modules
 const __filename = fileURLToPath(import.meta.url)
@@ -129,6 +130,14 @@ const paymentLimiter = rateLimit({
   standardHeaders: true
 })
 
+// Pharmacy submissions - moderate rate limit
+const pharmacyLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 10,
+  message: { success: false, message: "Too many pharmacy requests, please try again later" },
+  standardHeaders: true
+})
+
 // Apply global limiter
 app.use(globalLimiter)
 
@@ -203,6 +212,7 @@ app.use('/api/auth', authLimiter, authRoutes)
 app.use('/api/queue', queueLimiter, queueRoutes)
 app.use('/api/payment', paymentLimiter, paymentRoutes)
 app.use('/api/notifications', notificationRoutes)
+app.use('/api/pharmacy', pharmacyLimiter, pharmacyRoutes)
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
