@@ -3,13 +3,8 @@ import { Helmet } from 'react-helmet-async'
 import { apiRequest } from '../utils/api'
 
 export default function Pharmacy() {
-<<<<<<< HEAD
-  const [prescription, setPrescription] = useState(null)
-  const [details, setDetails] = useState('')
-=======
   const [prescriptionFile, setPrescriptionFile] = useState(null)
-  const [notes, setNotes] = useState('')
->>>>>>> b4da9370237f90fd367146828f5a198e592eb45f
+  const [details, setDetails] = useState('')
   const [requestStatus, setRequestStatus] = useState('')
   const [requestError, setRequestError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -17,8 +12,8 @@ export default function Pharmacy() {
   const handleSubmit = async () => {
     setRequestError('')
 
-    if (!prescriptionFile && !notes.trim()) {
-      setRequestError('Please upload a prescription or provide a note for your request.')
+    if (!prescriptionFile && !details.trim()) {
+      setRequestError('Please upload a prescription or enter your name and phone number.')
       setRequestStatus('')
       return
     }
@@ -30,8 +25,8 @@ export default function Pharmacy() {
       if (prescriptionFile) {
         formData.append('prescription', prescriptionFile)
       }
-      if (notes.trim()) {
-        formData.append('customization', notes.trim())
+      if (details.trim()) {
+        formData.append('customization', details.trim())
       }
 
       await apiRequest('/pharmacy/request', {
@@ -44,6 +39,7 @@ export default function Pharmacy() {
       const input = document.getElementById('prescription-upload')
       if (input) input.value = ''
       setPrescriptionFile(null)
+      setDetails('')
     } catch (error) {
       setRequestStatus('')
       setRequestError(error.message || 'Unable to submit your request. Please try again.')
@@ -84,7 +80,7 @@ export default function Pharmacy() {
             margin: '0 auto',
             lineHeight: '1.7'
           }}>
-            Upload your prescription or request medication customization, and our pharmacy team will arrange home delivery of your medicines.
+            Upload your prescription and share your contact details, and our pharmacy team will arrange home delivery of your medicines.
           </p>
         </div>
 
@@ -113,7 +109,7 @@ export default function Pharmacy() {
                   fontSize: '15px',
                   margin: 0
                 }}>
-                  Upload your prescription or request medication customization. Our team will review your request and arrange delivery of your medicines to your home with care and discretion.
+                  Upload your prescription and provide your contact details. Our team will review your request and arrange delivery of your medicines to your home with care and discretion.
                 </p>
               </div>
 
@@ -172,15 +168,12 @@ export default function Pharmacy() {
                   padding: '28px'
                 }}>
                   <h3 style={{ fontSize: '20px', marginBottom: '12px', color: '#0A1628', fontWeight: '700' }}>
-                    Enter your details below
+                    Enter your details below (name, phone number)
                   </h3>
-                  <p style={{ color: '#64748B', fontSize: '14px', lineHeight: '1.75', marginBottom: '18px' }}>
-                    Name, phone number and any additional information for our pharmacy team.
-                  </p>
                   <textarea
                     value={details}
                     onChange={(e) => setDetails(e.target.value)}
-                    placeholder="Enter your details below (name, phone number)"
+                    placeholder={'Name:\nPhone number:'}
                     style={{
                       width: '100%',
                       minHeight: '120px',
@@ -209,20 +202,8 @@ export default function Pharmacy() {
                   Home delivery • Fast delivery • Same-day availability • Online and cash payment
                 </div>
                 <button
-<<<<<<< HEAD
-                  onClick={() => {
-                    setRequestError('')
-                    if (!prescription && !details.trim()) {
-                      setRequestError('Please upload a prescription or provide your contact details.')
-                      setRequestStatus('')
-                      return
-                    }
-                    setRequestStatus('Your request has been submitted. Our pharmacy team will contact you soon to arrange home delivery.')
-                  }}
-=======
                   onClick={handleSubmit}
                   disabled={submitting}
->>>>>>> b4da9370237f90fd367146828f5a198e592eb45f
                   style={{
                     background: '#0B7B6F',
                     color: '#fff',
@@ -235,7 +216,7 @@ export default function Pharmacy() {
                     opacity: submitting ? 0.7 : 1
                   }}
                 >
-                  Submit request
+                  {submitting ? 'Submitting...' : 'Submit request'}
                 </button>
               </div>
 
