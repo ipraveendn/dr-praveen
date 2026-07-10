@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet-async'
 
 export default function Pharmacy() {
   const [prescription, setPrescription] = useState(null)
-  const [notes, setNotes] = useState('')
+  const [details, setDetails] = useState('')
   const [requestStatus, setRequestStatus] = useState('')
   const [requestError, setRequestError] = useState('')
 
@@ -127,15 +127,15 @@ export default function Pharmacy() {
                   padding: '28px'
                 }}>
                   <h3 style={{ fontSize: '20px', marginBottom: '12px', color: '#0A1628', fontWeight: '700' }}>
-                    Request customization
+                    Enter your details below
                   </h3>
                   <p style={{ color: '#64748B', fontSize: '14px', lineHeight: '1.75', marginBottom: '18px' }}>
-                    Mention your preferred brand, dosage, or any special instruction and our team will assist you.
+                    Name, phone number and any additional information for our pharmacy team.
                   </p>
                   <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Add any instruction or request for home delivery"
+                    value={details}
+                    onChange={(e) => setDetails(e.target.value)}
+                    placeholder="Enter your details below (name, phone number)"
                     style={{
                       width: '100%',
                       minHeight: '120px',
@@ -166,8 +166,8 @@ export default function Pharmacy() {
                 <button
                   onClick={() => {
                     setRequestError('')
-                    if (!prescription && !notes.trim()) {
-                      setRequestError('Please upload a prescription or provide a note for your request.')
+                    if (!prescription && !details.trim()) {
+                      setRequestError('Please upload a prescription or provide your contact details.')
                       setRequestStatus('')
                       return
                     }
