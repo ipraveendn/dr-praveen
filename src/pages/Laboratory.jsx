@@ -439,12 +439,12 @@ export default function Laboratory() {
                 <a
                   href={`tel:+91${LAB_CONTACT}`}
                   style={{
-                    fontFamily: "'Cormorant Garamond',serif",
-                    fontSize: 'clamp(28px, 4vw, 34px)',
-                    fontWeight: '700',
+                    fontFamily: "'DM Sans',sans-serif",
+                    fontSize: 'clamp(24px, 3.5vw, 30px)',
+                    fontWeight: '600',
                     color: '#fff',
                     textDecoration: 'none',
-                    letterSpacing: '0.5px'
+                    letterSpacing: '1.5px'
                   }}
                 >
                   +91 {LAB_CONTACT}
