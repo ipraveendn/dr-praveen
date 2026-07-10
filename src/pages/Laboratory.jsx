@@ -1,5 +1,6 @@
 import { Helmet } from 'react-helmet-async'
-import { DOCTOR } from '../data/content'
+import { Phone } from 'lucide-react'
+import { DOCTOR, WHATSAPP_MSG } from '../data/content'
 
 const LAB_CONTACT = DOCTOR.whatsapp || '9686039505'
 
@@ -414,32 +415,97 @@ export default function Laboratory() {
                 please contact our laboratory team.
               </p>
 
-              <a
-                href={`tel:+91${LAB_CONTACT}`}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
+              <div style={{
+                display: 'inline-flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '20px',
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: '14px',
+                padding: '32px 40px',
+                minWidth: 'min(100%, 360px)'
+              }}>
+                <span style={{
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  letterSpacing: '1.2px',
+                  textTransform: 'uppercase',
+                  color: 'rgba(255,255,255,0.55)'
+                }}>
+                  Contact Laboratory Team
+                </span>
+
+                <a
+                  href={`tel:+91${LAB_CONTACT}`}
+                  style={{
+                    fontFamily: "'Cormorant Garamond',serif",
+                    fontSize: 'clamp(28px, 4vw, 34px)',
+                    fontWeight: '700',
+                    color: '#fff',
+                    textDecoration: 'none',
+                    letterSpacing: '0.5px'
+                  }}
+                >
+                  +91 {LAB_CONTACT}
+                </a>
+
+                <div style={{
+                  display: 'flex',
                   gap: '12px',
-                  background: 'linear-gradient(135deg, #0B7B6F, #096358)',
-                  color: '#fff',
-                  padding: '16px 32px',
-                  borderRadius: '12px',
-                  fontWeight: '700',
-                  fontSize: '18px',
-                  textDecoration: 'none',
-                  transition: 'all 0.3s'
-                }}
-              >
-                <span style={{ fontSize: '22px' }}>📞</span>
-                +91 {LAB_CONTACT}
-              </a>
+                  flexWrap: 'wrap',
+                  justifyContent: 'center'
+                }}>
+                  <a
+                    href={`tel:+91${LAB_CONTACT}`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: 'linear-gradient(135deg, #0B7B6F, #096358)',
+                      color: '#fff',
+                      padding: '12px 24px',
+                      borderRadius: '10px',
+                      fontWeight: '600',
+                      fontSize: '14px',
+                      textDecoration: 'none',
+                      transition: 'all 0.3s'
+                    }}
+                  >
+                    <Phone size={16} />
+                    Call Now
+                  </a>
+                  <a
+                    href={`https://wa.me/${LAB_CONTACT}?text=${encodeURIComponent(WHATSAPP_MSG)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: 'rgba(255,255,255,0.08)',
+                      color: '#fff',
+                      padding: '12px 24px',
+                      borderRadius: '10px',
+                      fontWeight: '600',
+                      fontSize: '14px',
+                      textDecoration: 'none',
+                      border: '1px solid rgba(255,255,255,0.18)',
+                      transition: 'all 0.3s'
+                    }}
+                  >
+                    WhatsApp
+                  </a>
+                </div>
+              </div>
 
               <p style={{
                 fontSize: '13px',
-                color: 'rgba(255,255,255,0.5)',
-                marginTop: '20px'
+                color: 'rgba(255,255,255,0.45)',
+                marginTop: '24px',
+                letterSpacing: '0.2px'
               }}>
-                Call or WhatsApp for more details
+                Available for package details and home sample collection scheduling
               </p>
             </div>
           </div>
