@@ -1,6 +1,7 @@
-import { useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { DOCTOR } from '../data/content'
+
+const LAB_CONTACT = DOCTOR.whatsapp || '9686039505'
 
 // Individual Tests
 const TESTS = [
@@ -134,71 +135,6 @@ const PACKAGES = [
 ]
 
 export default function Laboratory() {
-  const [selectedTests, setSelectedTests] = useState([])
-  const [selectedPackage, setSelectedPackage] = useState(null)
-  const [collectionType, setCollectionType] = useState('home')
-  const [address, setAddress] = useState('')
-  const [phone, setPhone] = useState('')
-  const [date, setDate] = useState('')
-  const [reportAccess, setReportAccess] = useState('email')
-  const [bookingStatus, setBookingStatus] = useState('')
-  const [bookingError, setBookingError] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  const toggleTest = (test) => {
-    setSelectedTests(prev => 
-      prev.some(t => t.id === test.id)
-        ? prev.filter(t => t.id !== test.id)
-        : [...prev, test]
-    )
-  }
-
-  const selectPackage = (pkg) => {
-    setSelectedPackage(pkg)
-    setSelectedTests([])
-  }
-
-  const getTestsToDisplay = () => {
-    if (selectedPackage) {
-      return selectedPackage.tests.length + ' tests included'
-    }
-    return selectedTests.length > 0 ? `${selectedTests.length} tests selected` : 'No tests selected'
-  }
-
-  const getTotalPrice = () => {
-    if (selectedPackage) return selectedPackage.price
-    return selectedTests.reduce((sum, t) => sum + t.price, 0)
-  }
-
-  const handleBooking = async () => {
-    if (!phone || !address || !date) {
-      setBookingStatus('')
-      setBookingError('Please fill all required fields before confirming your booking.')
-      return
-    }
-
-    if (getTotalPrice() === 0) {
-      setBookingStatus('')
-      setBookingError('Please select a package or individual tests.')
-      return
-    }
-
-    setIsSubmitting(true)
-    setBookingError('')
-    setBookingStatus('')
-
-    try {
-      await new Promise(resolve => setTimeout(resolve, 600))
-      setBookingStatus(`Booking confirmed. For further details, call ${DOCTOR.phone}.`)
-    } catch (error) {
-      setBookingStatus('')
-      setBookingError(`Unable to complete your booking. Please try again or call ${DOCTOR.phone} for assistance.`)
-      console.error('[LABORATORY BOOKING ERROR]', error)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
   return (
     <>
       <Helmet>
@@ -302,15 +238,13 @@ export default function Laboratory() {
                     {categoryPackages.map(pkg => (
                       <div 
                         key={pkg.id}
-                        onClick={() => selectPackage(pkg)}
                         style={{
-                          background: selectedPackage?.id === pkg.id ? 'linear-gradient(135deg,#0B7B6F,#096358)' : '#f8fafa',
+                          background: '#f8fafa',
                           borderRadius: '16px',
                           padding: '28px',
-                          border: selectedPackage?.id === pkg.id ? '2px solid #0B7B6F' : '1px solid #E2EEEC',
-                          cursor: 'pointer',
+                          border: '1px solid #E2EEEC',
                           transition: 'all 0.3s',
-                          color: selectedPackage?.id === pkg.id ? '#fff' : '#0A1628',
+                          color: '#0A1628',
                           position: 'relative'
                         }}
                       >
@@ -319,8 +253,8 @@ export default function Laboratory() {
                           position: 'absolute',
                           top: '12px',
                           right: '12px',
-                          background: selectedPackage?.id === pkg.id ? 'rgba(255,255,255,0.2)' : '#E6F4F2',
-                          color: selectedPackage?.id === pkg.id ? '#fff' : '#0B7B6F',
+                          background: '#E6F4F2',
+                          color: '#0B7B6F',
                           padding: '4px 10px',
                           borderRadius: '20px',
                           fontSize: '11px',
@@ -335,14 +269,14 @@ export default function Laboratory() {
                           width: '60px',
                           height: '60px',
                           borderRadius: '12px',
-                          background: selectedPackage?.id === pkg.id ? pkg.color : pkg.color + '15',
+                          background: pkg.color + '15',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           marginBottom: '16px',
                           fontWeight: '700',
                           fontSize: '20px',
-                          color: selectedPackage?.id === pkg.id ? '#fff' : pkg.color,
+                          color: pkg.color,
                           transition: 'all 0.3s'
                         }}>
                           {pkg.badge}
@@ -352,7 +286,7 @@ export default function Laboratory() {
                         </h4>
                         <p style={{
                           fontSize: '13px',
-                          color: selectedPackage?.id === pkg.id ? 'rgba(255,255,255,0.7)' : '#64748B',
+                          color: '#64748B',
                           marginBottom: '16px',
                           lineHeight: '1.5',
                           minHeight: '40px'
@@ -361,7 +295,7 @@ export default function Laboratory() {
                         </p>
                         <p style={{
                           fontSize: '12px',
-                          color: selectedPackage?.id === pkg.id ? 'rgba(255,255,255,0.8)' : '#94A3B8',
+                          color: '#94A3B8',
                           marginBottom: '16px',
                           lineHeight: '1.6'
                         }}>
@@ -370,7 +304,7 @@ export default function Laboratory() {
                         <p style={{
                           fontSize: '28px',
                           fontWeight: '700',
-                          color: selectedPackage?.id === pkg.id ? '#fff' : '#0B7B6F'
+                          color: '#0B7B6F'
                         }}>
                           ₹{pkg.price}
                         </p>
@@ -389,7 +323,7 @@ export default function Laboratory() {
               marginBottom: '48px'
             }}>
               <div style={{ flex: 1, height: '1px', background: '#E2EEEC' }} />
-              <span style={{ color: '#94A3B8', fontSize: '13px', fontWeight: '600' }}>OR SELECT INDIVIDUAL TESTS</span>
+              <span style={{ color: '#94A3B8', fontSize: '13px', fontWeight: '600' }}>INDIVIDUAL TESTS ALSO AVAILABLE</span>
               <div style={{ flex: 1, height: '1px', background: '#E2EEEC' }} />
             </div>
 
@@ -412,22 +346,14 @@ export default function Laboratory() {
               {TESTS.map(test => (
                 <div 
                   key={test.id}
-                  onClick={() => toggleTest(test)}
                   style={{
-                    background: selectedTests.some(t => t.id === test.id) ? '#E6F4F2' : '#fff',
-                    border: selectedTests.some(t => t.id === test.id) ? '2px solid #0B7B6F' : '1px solid #E2EEEC',
+                    background: '#fff',
+                    border: '1px solid #E2EEEC',
                     borderRadius: '12px',
                     padding: '16px',
-                    cursor: 'pointer',
                     transition: 'all 0.3s'
                   }}
                 >
-                  <input 
-                    type="checkbox"
-                    checked={selectedTests.some(t => t.id === test.id)}
-                    onChange={() => {}}
-                    style={{ marginBottom: '8px', cursor: 'pointer' }}
-                  />
                   <h5 style={{ fontSize: '14px', fontWeight: '700', color: '#0A1628', marginBottom: '6px' }}>
                     {test.name}
                   </h5>
@@ -441,269 +367,83 @@ export default function Laboratory() {
               ))}
             </div>
 
-            {/* BOOKING FORM */}
+            {/* CONTACT FOR DETAILS */}
             <div style={{
-              background: '#F8FAFA',
+              background: 'linear-gradient(135deg, #0A1628, #0F2040)',
               borderRadius: '16px',
-              padding: '40px',
+              padding: '48px 40px',
               marginBottom: '40px',
-              border: '1px solid #E2EEEC'
+              textAlign: 'center'
             }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 14px',
+                borderRadius: '999px',
+                background: 'rgba(15, 168, 152, 0.15)',
+                color: '#0FA898',
+                fontSize: '13px',
+                fontWeight: '700',
+                letterSpacing: '0.5px',
+                textTransform: 'uppercase',
+                marginBottom: '20px'
+              }}>
+                Available Diagnostic Packages
+              </div>
+
               <h2 style={{
                 fontFamily: "'Cormorant Garamond',serif",
-                fontSize: '28px',
-                marginBottom: '30px',
-                color: '#0A1628'
+                fontSize: 'clamp(28px, 4vw, 36px)',
+                marginBottom: '16px',
+                color: '#fff',
+                fontWeight: '700'
               }}>
-                Book Your Test
+                Enquire About <em style={{ color: '#0FA898', fontStyle: 'italic' }}>Our Packages</em>
               </h2>
 
-              <div className="lab-booking-grid" style={{
-                display: 'grid',
-                gap: '30px'
+              <p style={{
+                fontSize: '15px',
+                lineHeight: '1.8',
+                color: 'rgba(255,255,255,0.75)',
+                maxWidth: '620px',
+                margin: '0 auto 32px'
               }}>
-                {/* LEFT: FORM */}
-                <div>
-                  <div style={{ marginBottom: '20px' }}>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#0A1628' }}>
-                      Your Phone Number *
-                    </label>
-                    <input 
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="Enter your phone number"
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '1px solid #E2EEEC',
-                        borderRadius: '10px',
-                        fontSize: '14px',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                  </div>
+                The packages and individual tests listed above represent our available diagnostic offerings.
+                For detailed information, package inclusions, or to schedule home sample collection,
+                please contact our laboratory team.
+              </p>
 
-                  <div style={{ marginBottom: '20px' }}>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#0A1628' }}>
-                      Collection Address *
-                    </label>
-                    <textarea 
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      placeholder="Where should we collect samples?"
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '1px solid #E2EEEC',
-                        borderRadius: '10px',
-                        fontSize: '14px',
-                        fontFamily: 'inherit',
-                        minHeight: '80px',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ marginBottom: '20px' }}>
-                    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#0A1628' }}>
-                      Preferred Collection Date *
-                    </label>
-                    <input 
-                      type="date"
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '1px solid #E2EEEC',
-                        borderRadius: '10px',
-                        fontSize: '14px',
-                        boxSizing: 'border-box'
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ marginBottom: '20px' }}>
-                    <label style={{ display: 'block', marginBottom: '12px', fontWeight: '600', color: '#0A1628' }}>
-                      Report Access Method
-                    </label>
-                    <div style={{ display: 'flex', gap: '16px' }}>
-                      {['email', 'portal', 'app'].map(method => (
-                        <label key={method} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                          <input 
-                            type="radio"
-                            name="reportAccess"
-                            value={method}
-                            checked={reportAccess === method}
-                            onChange={(e) => setReportAccess(e.target.value)}
-                          />
-                          <span style={{ fontSize: '14px', fontWeight: '500', color: '#0A1628' }}>
-                            {method === 'email' ? 'Email' : method === 'portal' ? 'Portal' : 'App'}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div style={{
-                    background: '#E6F4F2',
-                    padding: '16px',
-                    borderRadius: '10px',
-                    border: '1px solid #0B7B6F',
-                    fontSize: '13px',
-                    color: '#0B7B6F',
-                    lineHeight: '1.6'
-                  }}>
-                    <strong>Pro Tip:</strong> Fast for 8-10 hours before blood collection for accurate results
-                  </div>
-                </div>
-
-                {/* RIGHT: SUMMARY */}
-                <div style={{
-                  background: '#fff',
+              <a
+                href={`tel:+91${LAB_CONTACT}`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  background: 'linear-gradient(135deg, #0B7B6F, #096358)',
+                  color: '#fff',
+                  padding: '16px 32px',
                   borderRadius: '12px',
-                  padding: '28px',
-                  border: '1px solid #E2EEEC',
-                  height: 'fit-content'
-                }}>
-                  <h4 style={{ fontWeight: '700', color: '#0A1628', marginBottom: '20px', fontSize: '18px' }}>
-                    Order Summary
-                  </h4>
+                  fontWeight: '700',
+                  fontSize: '18px',
+                  textDecoration: 'none',
+                  transition: 'all 0.3s'
+                }}
+              >
+                <span style={{ fontSize: '22px' }}>📞</span>
+                +91 {LAB_CONTACT}
+              </a>
 
-                  {selectedPackage ? (
-                    <div style={{
-                      background: '#F8FAFA',
-                      borderRadius: '10px',
-                      padding: '16px',
-                      marginBottom: '20px'
-                    }}>
-                      <h5 style={{ fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>
-                        {selectedPackage.name}
-                      </h5>
-                      <p style={{ fontSize: '12px', color: '#94A3B8', lineHeight: '1.5' }}>
-                        {selectedPackage.tests.join(', ')}
-                      </p>
-                      <p style={{ fontSize: '16px', fontWeight: '700', color: '#0B7B6F', marginTop: '12px' }}>
-                        ₹{selectedPackage.price}
-                      </p>
-                    </div>
-                  ) : selectedTests.length > 0 ? (
-                    <div>
-                      {selectedTests.map(test => (
-                        <div key={test.id} style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          fontSize: '13px',
-                          marginBottom: '10px',
-                          paddingBottom: '10px',
-                          borderBottom: '1px solid #E2EEEC'
-                        }}>
-                          <span style={{ color: '#0A1628', fontWeight: '500' }}>{test.name}</span>
-                          <span style={{ color: '#0B7B6F', fontWeight: '600' }}>₹{test.price}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{
-                      background: '#FEE2E2',
-                      color: '#DC2626',
-                      padding: '12px',
-                      borderRadius: '8px',
-                      fontSize: '13px',
-                      marginBottom: '20px'
-                    }}>
-                      Please select tests or a package
-                    </div>
-                  )}
-
-                  <div style={{
-                    background: '#F8FAFA',
-                    borderRadius: '10px',
-                    padding: '16px',
-                    marginTop: '20px',
-                    borderTop: '1px solid #E2EEEC'
-                  }}>
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      marginBottom: '8px',
-                      fontSize: '13px'
-                    }}>
-                      <span style={{ color: '#64748B' }}>Sample Collection</span>
-                      <span style={{ color: '#0B7B6F', fontWeight: '600' }}>FREE</span>
-                    </div>
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      marginBottom: '12px',
-                      fontSize: '13px'
-                    }}>
-                      <span style={{ color: '#64748B' }}>Home Delivery Report</span>
-                      <span style={{ color: '#0B7B6F', fontWeight: '600' }}>FREE</span>
-                    </div>
-                  </div>
-
-                  <div style={{
-                    background: 'linear-gradient(135deg,#0A1628,#0F2040)',
-                    borderRadius: '10px',
-                    padding: '16px',
-                    color: '#fff',
-                    marginTop: '20px',
-                    textAlign: 'center'
-                  }}>
-                    <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', marginBottom: '8px' }}>
-                      Total Amount
-                    </div>
-                    <div style={{ fontSize: '28px', fontWeight: '700', color: '#0FA898' }}>
-                      ₹{getTotalPrice()}
-                    </div>
-                  </div>
-
-                  <button 
-                    onClick={handleBooking}
-                    disabled={getTotalPrice() === 0 || isSubmitting}
-                    style={{
-                      width: '100%',
-                      background: getTotalPrice() === 0 || isSubmitting ? '#cbd5e1' : 'linear-gradient(135deg,#0B7B6F,#096358)',
-                      color: '#fff',
-                      border: 'none',
-                      padding: '14px',
-                      borderRadius: '10px',
-                      fontWeight: '700',
-                      fontSize: '15px',
-                      cursor: getTotalPrice() === 0 || isSubmitting ? 'not-allowed' : 'pointer',
-                      marginTop: '20px',
-                      transition: 'all 0.3s'
-                    }}
-                  >
-                    {isSubmitting ? 'Sending confirmation...' : 'Book Test Now'}
-                  </button>
-                  {bookingStatus && (
-                    <div style={{ marginTop: '16px', color: '#0B7B6F', fontWeight: '600' }}>
-                      {bookingStatus}
-                    </div>
-                  )}
-                  {bookingError && (
-                    <div style={{ marginTop: '16px', color: '#DC2626', fontWeight: '600' }}>
-                      {bookingError}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <p style={{
+                fontSize: '13px',
+                color: 'rgba(255,255,255,0.5)',
+                marginTop: '20px'
+              }}>
+                Call or WhatsApp for more details
+              </p>
             </div>
           </div>
         </section>
-
-        <style>{`
-          .lab-booking-grid { grid-template-columns: 1fr 1fr; }
-
-          @media (max-width: 768px) {
-            .lab-booking-grid { grid-template-columns: 1fr !important; gap: 18px; }
-            .lab-booking-grid > div { padding: 18px !important; }
-            .lab-booking-grid .btn-primary, .lab-booking-grid .btn-secondary { width: 100% !important; }
-          }
-        `}</style>
 
         {/* WHY CHOOSE US */}
         <section style={{ padding: '70px 5%', background: 'linear-gradient(180deg, #F8FAFA 0%, #F4FBFA 100%)' }}>
@@ -734,7 +474,7 @@ export default function Laboratory() {
                 Why Choose <em style={{ color: '#0B7B6F' }}>Our Laboratory</em>
               </h2>
               <p style={{ fontSize: '15px', lineHeight: '1.8', color: '#64748B' }}>
-                Precision-led testing, professional support, and a seamless experience from booking to report delivery.
+                Precision-led testing, professional support, and a seamless experience from sample collection to report delivery.
               </p>
             </div>
 
