@@ -77,7 +77,7 @@ export async function apiFetch(url, options = {}) {
 
   const headers = { ...options.headers };
 
-  if (!headers['Content-Type'] && options.body) {
+  if (!headers['Content-Type'] && options.body && !(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
 

@@ -1,11 +1,51 @@
 import { useState } from 'react'
 import { Helmet } from 'react-helmet-async'
+import { apiRequest } from '../utils/api'
 
 export default function Pharmacy() {
-  const [prescription, setPrescription] = useState(null)
+  const [prescriptionFile, setPrescriptionFile] = useState(null)
   const [notes, setNotes] = useState('')
   const [requestStatus, setRequestStatus] = useState('')
   const [requestError, setRequestError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async () => {
+    setRequestError('')
+
+    if (!prescriptionFile && !notes.trim()) {
+      setRequestError('Please upload a prescription or provide a note for your request.')
+      setRequestStatus('')
+      return
+    }
+
+    setSubmitting(true)
+
+    try {
+      const formData = new FormData()
+      if (prescriptionFile) {
+        formData.append('prescription', prescriptionFile)
+      }
+      if (notes.trim()) {
+        formData.append('customization', notes.trim())
+      }
+
+      await apiRequest('/pharmacy/request', {
+        method: 'POST',
+        body: formData,
+      })
+
+      setRequestStatus('Your request has been submitted. Our pharmacy team will contact you soon to arrange home delivery.')
+
+      const input = document.getElementById('prescription-upload')
+      if (input) input.value = ''
+      setPrescriptionFile(null)
+    } catch (error) {
+      setRequestStatus('')
+      setRequestError(error.message || 'Unable to submit your request. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <>
@@ -93,7 +133,7 @@ export default function Pharmacy() {
                     type="file"
                     id="prescription-upload"
                     accept="image/*,.pdf"
-                    onChange={(e) => setPrescription(e.target.files[0]?.name || null)}
+                    onChange={(e) => setPrescriptionFile(e.target.files[0] || null)}
                     style={{ display: 'none' }}
                   />
                   <label htmlFor="prescription-upload" style={{
@@ -108,14 +148,14 @@ export default function Pharmacy() {
                   }}>
                     Upload prescription
                   </label>
-                  {prescription && (
+                  {prescriptionFile && (
                     <div style={{
                       marginTop: '16px',
                       color: '#0A1628',
                       fontSize: '14px',
                       lineHeight: '1.6'
                     }}>
-                      Selected file: {prescription}
+                      Selected file: {prescriptionFile.name}
                     </div>
                   )}
                 </div>
@@ -164,15 +204,8 @@ export default function Pharmacy() {
                   Home delivery • Fast delivery • Same-day availability • Online and cash payment
                 </div>
                 <button
-                  onClick={() => {
-                    setRequestError('')
-                    if (!prescription && !notes.trim()) {
-                      setRequestError('Please upload a prescription or provide a note for your request.')
-                      setRequestStatus('')
-                      return
-                    }
-                    setRequestStatus('Your request has been submitted. Our pharmacy team will contact you soon to arrange home delivery.')
-                  }}
+                  onClick={handleSubmit}
+                  disabled={submitting}
                   style={{
                     background: '#0B7B6F',
                     color: '#fff',
@@ -180,8 +213,9 @@ export default function Pharmacy() {
                     padding: '14px 24px',
                     borderRadius: '12px',
                     fontWeight: '700',
-                    cursor: 'pointer',
-                    fontSize: '14px'
+                    cursor: submitting ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    opacity: submitting ? 0.7 : 1
                   }}
                 >
                   Submit request
