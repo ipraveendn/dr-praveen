@@ -147,7 +147,8 @@ const allowedOrigins = [
   "https://dr-praveen.onrender.com",
   "https://3000-firebase-dr-praveen-new-1778333674137.cluster-d5vecjrg5rhlkrz6nm4jtv7avc.cloudworkstations.dev",
   "https://dr-praveen.vercel.app",
-  "https://drpraveenramachandra.com"
+  "https://drpraveenramachandra.com",
+  "https://www.drpraveenramachandra.com"
 ];
 
 app.use(cors({
