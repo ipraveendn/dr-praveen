@@ -28,6 +28,12 @@ export const DOCTOR = {
   whatsapp: '9686039505',
   email: 'praveenendocrine@gmail.com',
   photo: "/doctor.jpg",
+  social: {
+    instagram: 'https://www.instagram.com/dr.praveenramachandra',
+    linkedin: 'https://www.linkedin.com/in/dr-praveen-ramachandra-4368354b?utm_source=share_via&utm_content=profile&utm_medium=member_android',
+    facebook: 'https://www.facebook.com/drpraveenendocrinology',
+    youtube: 'https://youtube.com/@praveenramachandra9265?si=KiWVecHlYbutSx04',
+  },
   bio: `Dr. Praveen Ramachandra is a highly qualified consultant endocrinologist with extensive experience in managing diabetes, thyroid disorders, hormonal imbalances, obesity, and PCOS. He is known for providing personalized, evidence-based care to ensure long-term patient well-being.`,
   shortBio: `Specialist in diabetes, thyroid, hormones and metabolic disorders.`,
 }

@@ -85,19 +85,19 @@ export default function Footer() {
 
             {/* ✅ NEW PROFESSIONAL ICONS */}
             <div style={{ display: 'flex', gap: '12px' }}>
-              <a href="https://www.facebook.com/drpraveenendocrinology" target="_blank" rel="noreferrer" style={iconBox}>
+              <a href={DOCTOR.social.facebook} target="_blank" rel="noreferrer" style={iconBox}>
                 <Facebook size={18} />
               </a>
 
-              <a href="https://www.instagram.com/drpraveenmd" target="_blank" rel="noreferrer" style={iconBox}>
+              <a href={DOCTOR.social.instagram} target="_blank" rel="noreferrer" style={iconBox}>
                 <Instagram size={18} />
               </a>
 
-              <a href="https://www.linkedin.com/in/dr-praveen-ramachandra" target="_blank" rel="noreferrer" style={iconBox}>
+              <a href={DOCTOR.social.linkedin} target="_blank" rel="noreferrer" style={iconBox}>
                 <Linkedin size={18} />
               </a>
 
-              <a href="https://youtube.com/@praveenramachandra9265?si=KiWVecHlYbutSx04" target="_blank" rel="noreferrer" style={iconBox}>
+              <a href={DOCTOR.social.youtube} target="_blank" rel="noreferrer" style={iconBox}>
                 <Youtube size={18} />
               </a>
             </div>
