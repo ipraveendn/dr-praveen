@@ -463,7 +463,7 @@ export default function Queue() {
                   <p style={{ fontSize: '14px', color: '#0A1628', fontWeight: '600' }}> SMS sent to {form.phone}</p>
                   <p style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>Your token number and live tracking link have been sent.</p>
                 </div>
-                <a href={`/track?phone=${form.phone}`} className="btn-primary" style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px', textDecoration: 'none' }}> Track My Position Live</a>
+                {/* <a href={`/track?phone=${form.phone}`} className="btn-primary" style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px', textDecoration: 'none' }}> Track My Position Live</a> */}
                 <button onClick={() => { setStep(1); setToken(null); setPaymentMethod('cash'); setPaymentScreenshot(null); setForm({ name:'',phone:'',doctor:'Dr. Praveen Ramachandra',reason:'',email:'',place:'' }); setClinic(''); setConsultationMode(''); }} style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '13px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif" }}>Book Another Token</button>
               </div>
             )}
