@@ -5,6 +5,8 @@
  * Includes dynamic metadata generation, OpenGraph, Twitter cards, structured data.
  */
 
+import { DOCTOR as SITE_DOCTOR } from '../data/content'
+
 export const SITE_URL = import.meta.env.PROD 
   ? 'https://drpraveenramachandra.com'
   : 'http://localhost:5173'
@@ -154,8 +156,10 @@ export function generateStructuredData(type = 'LocalBusiness') {
     image: `${SITE_URL}/og-home.png`,
     logo: `${SITE_URL}/logo.svg`,
     sameAs: [
-      'https://www.facebook.com/drpraveenendocrinology',
-      'https://www.instagram.com/drpraveenmd',
+      SITE_DOCTOR.social.facebook,
+      SITE_DOCTOR.social.instagram,
+      SITE_DOCTOR.social.linkedin,
+      SITE_DOCTOR.social.youtube,
     ],
   }
 
