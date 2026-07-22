@@ -7,6 +7,29 @@ import SEOMeta from '../components/SEOMeta'
 
 const REASONS = ['Diabetes Checkup','Thyroid Consultation','Hormone Imbalance','Obesity/Weight','PCOS / PCOD','Gestational Diabetes','Pediatric Endocrinology','Osteoporosis','Adrenal Disorder','Pituitary Disorder','General Consultation','Other']
 
+function normalizePatient(patient) {
+  return {
+    ...patient,
+    tokenNumber: Number(patient.tokenNumber),
+    status: String(patient.status || '').toUpperCase(),
+  }
+}
+
+function buildQueueState(payload) {
+  if (!payload || !Array.isArray(payload.patients)) return null
+
+  const patients = payload.patients.map(normalizePatient)
+  const waitingCount = patients.filter(p => p.status === 'WAITING').length
+  const serving = patients.find(p => p.status === 'SERVING')
+
+  return {
+    currentToken: payload.currentToken ?? payload.currentServing ?? payload.nextServing ?? serving?.tokenNumber ?? null,
+    waiting: payload.waiting ?? payload.waitingCount ?? waitingCount,
+    estimatedTime: payload.estimatedTime || `${waitingCount * 5} mins`,
+    patients,
+  }
+}
+
 export default function AdminDashboard() {
   const navigate = useNavigate()
   const { logout } = useAuth('admin')
@@ -18,7 +41,8 @@ export default function AdminDashboard() {
   const [queueData, setQueueData]             = useState(null)
   const [queueLoading, setQueueLoading]       = useState(true)
   const [completeLoading, setCompleteLoading] = useState(false)
-  const [actionLoading, setActionLoading]     = useState(false)
+  const [actionLoading, setActionLoading] = useState(false)
+  const [actionError, setActionError] = useState('')
   
   // Track pending requests to avoid duplicates
   const pendingRequests = useRef({})
@@ -49,7 +73,7 @@ export default function AdminDashboard() {
 
     try {
       const json = await apiRequest(`/queue?clinic=${clinicId}`)
-      setQueueData(json?.data ?? null)
+      setQueueData(buildQueueState(json?.data ?? null))
     } catch (error) {
       console.error('[AdminDashboard] Queue fetch failed:', error)
       setQueueData(null)
@@ -82,18 +106,13 @@ export default function AdminDashboard() {
       
       // Update queue with response data if available
       if (response?.data?.patients) {
-        setQueueData({
-          currentToken: response.data.currentToken || queueData?.currentToken,
-          waiting: response.data.patients.filter(p => p.status === 'WAITING').length,
-          estimatedTime: response.data.estimatedTime || '0 mins',
-          patients: response.data.patients
-        })
+        setQueueData(buildQueueState(response.data))
       } else {
-        // Fallback: refresh queue if response doesn't have patients
         await refreshQueue(true)
       }
     } catch (error) {
       console.error('[AdminDashboard] Add patient failed:', error)
+      setActionError(error?.message || 'Failed to add patient.')
     } finally {
       setForm({ name: '', phone: '', reason: '' })
       setShowAdd(false)
@@ -107,28 +126,27 @@ export default function AdminDashboard() {
     }
     
     setActionLoading(true)
-    
-    // Mark mutation time to prevent auto-refresh interference
+    setActionError('')
     lastMutationTime.current = Date.now()
-    
-    // OPTIMISTIC UPDATE
+
     const nextPatient = waiting[0]
     const currentServing = serving
-    
-    const optimisticData = {
+    const previousQueueData = queueData
+
+    setQueueData(buildQueueState({
       ...queueData,
+      currentToken: nextPatient.tokenNumber,
       patients: queueData.patients.map(p => {
-        if (p.tokenNumber === currentServing?.tokenNumber) {
+        const tokenNumber = Number(p.tokenNumber)
+        if (currentServing && tokenNumber === Number(currentServing.tokenNumber)) {
           return { ...p, status: 'COMPLETED' }
         }
-        if (p.tokenNumber === nextPatient.tokenNumber) {
+        if (tokenNumber === Number(nextPatient.tokenNumber)) {
           return { ...p, status: 'SERVING' }
         }
         return p
       }),
-      currentToken: nextPatient.tokenNumber
-    }
-    setQueueData(optimisticData)
+    }))
     
     try {
       const response = await apiRequest('/queue/next', { 
@@ -136,24 +154,15 @@ export default function AdminDashboard() {
         body: JSON.stringify({ clinic: clinicId }) 
       })
       
-      // Update state with server response
       if (response?.data?.patients && Array.isArray(response.data.patients)) {
-        console.log('[AdminDashboard] callNext -> updating state from server response')
-        const newData = {
-          currentToken: response.data.nextServing || null,
-          waiting: response.data.patients.filter(p => p.status === 'WAITING').length,
-          estimatedTime: response.data.estimatedTime || '0 mins',
-          patients: response.data.patients
-        }
-        setQueueData(newData)
+        setQueueData(buildQueueState(response.data))
       } else {
         await refreshQueue(true)
       }
     } catch (error) {
       console.error('[AdminDashboard] callNext error:', error)
-      if (error?.status === 401) {
-        console.error('[CRITICAL] Authentication failed - token invalid or expired')
-      }
+      setActionError(error?.message || 'Failed to call next patient. Please try again.')
+      setQueueData(previousQueueData)
       await refreshQueue(true)
     } finally {
       setActionLoading(false)
@@ -166,52 +175,34 @@ export default function AdminDashboard() {
     }
     
     setCompleteLoading(true)
-    const servingTokenNumber = serving.tokenNumber
-    
-    // Mark mutation time to prevent auto-refresh interference
+    setActionError('')
+    const servingTokenNumber = Number(serving.tokenNumber)
     lastMutationTime.current = Date.now()
+    const previousQueueData = queueData
     
-    // OPTIMISTIC UPDATE
-    const optimisticData = {
+    setQueueData(buildQueueState({
       ...queueData,
-      patients: queueData.patients.map(p => 
-        p.tokenNumber === servingTokenNumber ? { ...p, status: 'COMPLETED' } : p
+      currentToken: null,
+      patients: queueData.patients.map(p =>
+        Number(p.tokenNumber) === servingTokenNumber ? { ...p, status: 'COMPLETED' } : p
       ),
-      currentToken: null
-    }
-    setQueueData(optimisticData)
+    }))
     
     try {
-      console.log('[AdminDashboard] markDone -> API CALL STARTING')
-      console.log('[AdminDashboard] markDone -> endpoint: /queue/complete/' + servingTokenNumber)
-      console.log('[AdminDashboard] markDone -> payload:', { clinic: clinicId })
-      
       const response = await apiRequest(`/queue/complete/${servingTokenNumber}`, {
         method: 'PATCH',
         body: JSON.stringify({ clinic: clinicId })
       })
       
-      console.log('[AdminDashboard] markDone -> API SUCCESS')
-      console.log('[AdminDashboard] markDone -> response:', response)
-      
-      // Update state with server response (confirms database persistence)
       if (response?.data?.patients && Array.isArray(response.data.patients)) {
-        console.log('[AdminDashboard] markDone -> updating state from server response')
-        const newData = {
-          currentToken: response.data.currentToken || response.data.currentServing || null,
-          waiting: response.data.waiting || response.data.waitingCount || 0,
-          estimatedTime: response.data.estimatedTime || '0 mins',
-          patients: response.data.patients
-        }
-        setQueueData(newData)
+        setQueueData(buildQueueState(response.data))
       } else {
         await refreshQueue(true)
       }
     } catch (error) {
       console.error('[AdminDashboard] Mark done failed with error:', error)
-      if (error?.status === 401) {
-        console.error('[CRITICAL AUTH ERROR] Not authenticated - token may be invalid or expired')
-      }
+      setActionError(error?.message || 'Failed to mark patient as complete. Please try again.')
+      setQueueData(previousQueueData)
       await refreshQueue(true)
     } finally {
       setCompleteLoading(false)
@@ -283,6 +274,15 @@ export default function AdminDashboard() {
       </div>
 
       <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+
+        {actionError && (
+          <div style={{
+            background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C',
+            borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px',
+          }}>
+            {actionError}
+          </div>
+        )}
 
        
         <div className="admin-stats" style={{

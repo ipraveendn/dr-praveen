@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import { PrismaClient } from '@prisma/client'
 import { getSupabaseClient } from '../utils/supabaseClient.js'
+import { getISTDateString } from '../utils/dateUtils.js'
 
 const prisma = new PrismaClient()
 const BUCKET = 'prescriptions'
@@ -17,9 +18,7 @@ const ALLOWED_MIME_TYPES = new Set([
 ])
 
 function buildStoragePath(originalName) {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const [year, month] = getISTDateString().split('-')
   const safeName = (originalName || 'prescription')
     .replace(/[^a-zA-Z0-9._-]/g, '_')
     .slice(0, 100)

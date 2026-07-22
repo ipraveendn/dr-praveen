@@ -162,7 +162,7 @@ export default function DoctorDashboard() {
           <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Cormorant Garamond',serif", fontWeight: '700', color: '#fff', fontSize: '14px' }}>PR</div>
           <div>
             <div style={{ color: '#fff', fontWeight: '700', fontSize: '14px' }}>Doctor Dashboard</div>
-            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px' }}>{DOCTOR.name} · {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+            <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px' }}>{DOCTOR.name} · {new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'long', day: 'numeric', month: 'long' })}</div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>

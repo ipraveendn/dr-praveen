@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken'
+import { getISTISOString } from '../utils/dateUtils.js'
 
 // Credentials (hardcoded for development - move to database in production)
 const VALID_CREDENTIALS = {
@@ -39,7 +40,7 @@ export const login = async (req, res) => {
         {
           username,
           role,
-          loginTime: new Date().toISOString()
+          loginTime: getISTISOString()
         },
         JWT_SECRET,
         { expiresIn: JWT_EXPIRE }

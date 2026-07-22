@@ -16,7 +16,7 @@ const requestCache = new Map()
 const pendingRequests = new Map()
 
 const CACHE_DURATION = 100 // 100ms - very short cache to prevent stale data
-const CACHE_WHITELIST = ['/queue'] // Only cache these endpoints
+const CACHE_WHITELIST = [] // Queue endpoints must always be fresh after mutations
 
 /**
  * Generate cache key from URL and options

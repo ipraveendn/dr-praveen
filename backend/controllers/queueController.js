@@ -3,23 +3,17 @@
 
 import { sendTokenNotificationSMS } from '../utils/smsService.js';
 import { PrismaClient } from '@prisma/client';
+import { getISTStartOfDay, getISTEndOfDay } from '../utils/dateUtils.js';
 
 const prisma = new PrismaClient();
 
 
 //  HELPER FUNCTIONS
 
-const getStartOfDay = () => {
-  const now = new Date();
-  now.setUTCHours(0, 0, 0, 0);
-  return now;
-};
+// Use IST (Asia/Kolkata) timezone for "today" so all reads and writes match consistently.
+const getStartOfDay = (date) => getISTStartOfDay(date);
+const getEndOfDay = (date) => getISTEndOfDay(date);
 
-const getEndOfDay = () => {
-  const now = new Date();
-  now.setUTCHours(23, 59, 59, 999);
-  return now;
-};
 
 
 
@@ -152,11 +146,8 @@ export const getQueueData = async (req, res) => {
   const { clinic } = req.query;
 
   try {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
+    const startOfDay = getStartOfDay();
+    const endOfDay = getEndOfDay();
 
     let whereClause = {};
 
@@ -364,6 +355,7 @@ export const callNextPatient = async (req, res) => {
               name: t.patient.name,
               status: t.status,
               phone: t.patient.phone,
+              reason: t.reasonForVisit,
               consultationMode: t.consultationMode || null
             }))
           }
@@ -416,7 +408,9 @@ export const callNextPatient = async (req, res) => {
             tokenNumber: t.tokenNumber,
             name: t.patient.name,
             status: t.status,
-            phone: t.patient.phone
+            phone: t.patient.phone,
+            reason: t.reasonForVisit,
+            consultationMode: t.consultationMode || null
           }))
         }
       };
@@ -585,7 +579,18 @@ export const completeConsultationByTokenNumber = async (req, res) => {
 
 export const getQueueStatus = async (req, res) => {
   try {
+    const todayStart = getStartOfDay();
+    const todayEnd = getEndOfDay();
+    const { clinicId } = req.params;
+    let whereClause = {
+      appointmentDate: { gte: todayStart, lte: todayEnd }
+    };
+    if (clinicId) {
+      whereClause.clinicId = clinicId;
+    }
+
     const queue = await prisma.token.findMany({
+      where: whereClause,
       orderBy: {
         tokenNumber: "asc"
       }

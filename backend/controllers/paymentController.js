@@ -2,6 +2,7 @@
 // Handles payment processing, verification, and refunds
 
 import { sendAppointmentSMS } from '../utils/smsService.js'
+import { getISTISOString } from '../utils/dateUtils.js'
 
 // Razorpay Configuration (placeholder - to be replaced with real keys)
 const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_key_placeholder'
@@ -38,7 +39,7 @@ export const createOrder = async (req, res) => {
     mockOrders.set(orderId, {
       amount,
       status: 'created',
-      createdAt: new Date().toISOString(),
+      createdAt: getISTISOString(),
       currency: 'INR'
     })
 
@@ -158,7 +159,7 @@ export const verifyPaymentRazorpay = async (req, res) => {
     // Update order status
     order.status = 'verified'
     order.paymentId = paymentId
-    order.verifiedAt = new Date().toISOString()
+    order.verifiedAt = getISTISOString()
     
     // ========== HANDLE OPTIONAL SMS AFTER PAYMENT ==========
     if (name && phone && reason && clinic) {

@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit'
 import dotenv from 'dotenv'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { getISTISOString } from './utils/dateUtils.js'
 import authRoutes from './routes/auth.js'
 import queueRoutes from './routes/queue.js'
 import paymentRoutes from './routes/payment.js'
@@ -36,7 +37,7 @@ const COLORS = {
 
 const colorize = (text, color) => `${color}${text}${COLORS.reset}`
 
-const ts = () => new Date().toISOString()
+const ts = () => getISTISOString()
 
 const methodColor = (method) => {
   if (method === 'GET') return COLORS.cyan
@@ -202,7 +203,7 @@ app.get('/', (req, res) => {
   res.json({
     message: 'API Running...',
     status: 'active',
-    timestamp: new Date().toISOString()
+    timestamp: getISTISOString()
   })
 })
 
@@ -220,7 +221,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'OK',
     message: 'Dr. Praveen Backend API is running',
-    timestamp: new Date().toISOString()
+    timestamp: getISTISOString()
   })
 })
 
@@ -290,7 +291,7 @@ app.use((err, req, res, next) => {
     error: err.name || 'Internal Server Error',
     message: err.message || 'An error occurred processing your request',
     status: statusCode,
-    timestamp: new Date().toISOString(),
+    timestamp: getISTISOString(),
     path: req.path,
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
   })
