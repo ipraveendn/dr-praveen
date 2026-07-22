@@ -266,7 +266,7 @@ export const CHATBOT_RESPONSES = {
   
   services: "🏥 Our Services:\n\n💉 Diabetes Management\n• Type 1 & 2 Diabetes\n• Prediabetes\n• Gestational Diabetes\n• Insulin management\n\n🩺 Thyroid Disorders\n• Hyperthyroidism & Hypothyroidism\n• Thyroid Nodules\n\n⚖️ Weight Management & Hormones\n• Obesity Management\n• PCOS/PCOD\n• Hormone Imbalance\n• Adrenal Disorders\n\n🦴 Bone & Vitamin Health\n• Osteoporosis\n• Vitamin D Deficiency\n\n👶 Specialized Care\n• Pediatric Endocrinology\n• Retinopathy Screening\n• Dyslipidemia Management",
   
-  fee: "💰 Consultation Fee:\n\n• General Consultation: ₹500\n• Follow-up Consultation: ₹300\n• Special Investigations: Based on type\n\n📌 Accepted Payment Methods:\n• Cash\n• Card\n• Online/UPI\n• Insurance (Depends on policy)\n\n💡 First-time patients get priority booking!",
+  fee: "💰 Consultation Fee:\n\n• General Consultation: ₹750\n• Follow-up Consultation: ₹300\n• Special Investigations: Based on type\n\n📌 Accepted Payment Methods:\n• Cash\n• Card\n• Online/UPI\n• Insurance (Depends on policy)\n\n💡 First-time patients get priority booking!",
   
   doctor: "👨‍⚕️ About Dr. Praveen Ramachandra:\n\n🏆 Credentials:\n• 15+ years of experience\n• Specialist in Endocrinology & Metabolism\n• Trusted by 10,000+ patients\n• Established 2011\n\n📚 Expertise:\n• Diabetes Management\n• Thyroid Disorders\n• Hormonal Disorders\n• PCOS/PCOD Treatment\n• Obesity Management\n\n📍 Clinics: DiaPlus & ThyroPlus\n\n🎥 YouTube: Expert health tips & diabetes care videos\n📞 Contact: 08041675151 (DiaPlus) / 08042095642 (ThyroPlus)",
   

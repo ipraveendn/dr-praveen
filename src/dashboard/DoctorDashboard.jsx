@@ -149,7 +149,7 @@ export default function DoctorDashboard() {
   const serving = apiPatients.find(p => p.status === 'SERVING') ?? null
   const waiting = apiPatients.filter(p => p.status === 'WAITING')
   const completed = apiPatients.filter(p => p.status === 'COMPLETED')
-  const revenue   = completed.length * 500
+  const revenue   = completed.length * 750
 
   return (
     <>

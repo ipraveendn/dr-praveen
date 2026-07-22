@@ -176,7 +176,7 @@ export function generateStructuredData(type = 'LocalBusiness') {
         addressCountry: 'IN',
       },
       areaServed: ['Yelahanka', 'Bengaluru', 'Karnataka'],
-      priceRange: '₹500-₹2000',
+      priceRange: '₹750-₹2000',
       openingHoursSpecification: {
         '@type': 'OpeningHoursSpecification',
         dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],

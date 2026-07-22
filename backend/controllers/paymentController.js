@@ -27,7 +27,7 @@ export const createOrder = async (req, res) => {
       return res.status(400).json({
         error: 'Bad Request',
         message: 'Valid amount is required',
-        example: { amount: 500 }
+        example: { amount: 750 }
       })
     }
 

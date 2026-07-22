@@ -10,7 +10,7 @@ import { apiRequest } from './api'
  * @param {number} amount - Amount in INR
  * @returns {Promise<Object>} - Order details {orderId, amount, currency}
  */
-export async function createPaymentOrder(amount = 500) {
+export async function createPaymentOrder(amount = 750) {
   try {
     return await apiRequest('/payment/create-order', {
       method: 'POST',

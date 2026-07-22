@@ -69,7 +69,7 @@ export default function AdminDashboard() {
   const waiting     = apiPatients.filter(p => p.status === 'WAITING')
   const serving     = apiPatients.find(p => p.status === 'SERVING')
   const completed   = apiPatients.filter(p => p.status === 'COMPLETED')
-  const revenue     = completed.length * 500
+  const revenue     = completed.length * 750
 
   async function addPatient() {
     if (!form.name || !form.phone || !form.reason) return

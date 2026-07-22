@@ -47,7 +47,7 @@ async function runPaymentTests() {
   try {
     // Step 1: Create payment order
     console.log('📝 Step 1: Creating payment order...');
-    const createResp = await makeRequest('POST', '/payment/create-order', { amount: 500 });
+    const createResp = await makeRequest('POST', '/payment/create-order', { amount: 750 });
     const orderId = createResp.body.orderId;
     console.log(`✓ Order created: ${orderId}`);
     console.log(`  Amount: ₹${createResp.body.amount}`);
@@ -98,7 +98,7 @@ async function runPaymentTests() {
 
     for (let i = 1; i <= 10; i++) {
       // Create order
-      const orderResp = await makeRequest('POST', '/payment/create-order', { amount: 500 });
+      const orderResp = await makeRequest('POST', '/payment/create-order', { amount: 750 });
       const testOrderId = orderResp.body.orderId;
       
       // Simulate payment

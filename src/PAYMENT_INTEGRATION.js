@@ -19,13 +19,13 @@
  *   → Button: "Proceed to Payment" (calls createOrder)
  * 
  * Step 3a: Create Order
- *   → POST /payment/create-order with {amount: 500}
+ *   → POST /payment/create-order with {amount: 750}
  *   → Backend generates orderId
  *   → Response: {orderId, amount, currency}
  *   → Automatically advances to Step 4
  * 
  * Step 4: Payment Screen (SIMULATION)
- *   → Show amount to pay: ₹500
+ *   → Show amount to pay: ₹750
  *   → Show order ID
  *   → Button: "Pay Now"
  *   → On Click:
@@ -60,7 +60,7 @@
 
 // 1. Create Payment Order
 import { createPaymentOrder } from '../utils/payment'
-const orderData = await createPaymentOrder(500) // Amount in INR
+const orderData = await createPaymentOrder(750) // Amount in INR
 // Returns: {orderId, amount, currency, success}
 
 // 2. Simulate Payment (for testing)
