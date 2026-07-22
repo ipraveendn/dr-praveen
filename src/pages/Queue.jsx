@@ -208,6 +208,38 @@ export default function Queue() {
   return (
     <>
       <SEOMeta pageKey="queue" />
+
+      {loading && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(10, 22, 40, 0.55)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: '20px', padding: '36px 32px',
+            maxWidth: '380px', width: '100%', textAlign: 'center',
+            boxShadow: '0 20px 60px rgba(11, 123, 111, 0.2)',
+            border: '1px solid #E2EEEC'
+          }}>
+            <div style={{
+              width: '52px', height: '52px', margin: '0 auto 20px',
+              border: '4px solid #E2EEEC', borderTopColor: '#0B7B6F',
+              borderRadius: '50%', animation: 'bookingSpin 0.8s linear infinite'
+            }} />
+            <h3 style={{
+              fontFamily: "'Cormorant Garamond',serif", fontSize: '24px',
+              fontWeight: '700', color: '#0A1628', marginBottom: '10px'
+            }}>
+              Confirming Your Booking
+            </h3>
+            <p style={{ color: '#64748B', fontSize: '14px', lineHeight: '1.7', margin: 0 }}>
+              Please wait while we confirm your booking. This may take a moment — do not refresh or close this page.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div style={{ paddingTop: '72px', minHeight: '100vh', background: '#F8FAFA' }}>
 
         {/* Header */}
@@ -436,16 +468,17 @@ export default function Queue() {
 
                 {error && <p style={{ color: '#ef4444', fontSize: '13px', marginBottom: '12px' }}>⚠️ {error}</p>}
                 <div className="action-row" style={{ display: 'flex', gap: '10px' }}>
-                  <button onClick={() => setStep(4)} className="btn-secondary" style={{ flex: 1 }}>← Back</button>
+                  <button onClick={() => setStep(4)} className="btn-secondary" style={{ flex: 1 }} disabled={loading}>← Back</button>
                   <button onClick={() => {
+                    if (loading) return
                     if (paymentMethod === 'online' && !paymentScreenshot) {
                       setError('Please upload your payment screenshot to confirm online payment.')
                       return
                     }
                     setError('')
                     generateToken()
-                  }} className="btn-primary" style={{ flex: 2, opacity: isPaymentReady() ? 1 : 0.65, cursor: isPaymentReady() ? 'pointer' : 'not-allowed' }}>
-                    Confirm Booking
+                  }} className="btn-primary" disabled={loading || !isPaymentReady()} style={{ flex: 2, opacity: loading || !isPaymentReady() ? 0.65 : 1, cursor: loading || !isPaymentReady() ? 'not-allowed' : 'pointer' }}>
+                    {loading ? 'Confirming...' : 'Confirm Booking'}
                   </button>
                 </div>
               </div>
@@ -471,6 +504,10 @@ export default function Queue() {
           <LiveQueue data={queueData} />
         </div>
         <style>{`
+          @keyframes bookingSpin {
+            to { transform: rotate(360deg); }
+          }
+
           /* Queue responsive tweaks */
           .queue-container { max-width: 560px; }
 
