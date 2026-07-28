@@ -180,6 +180,7 @@ export const getQueueData = async (req, res) => {
         consultationMode: true,
         patient: {
           select: {
+            id: true,
             name: true,
             phone: true,
           }
@@ -275,6 +276,148 @@ export const trackQueue = async (req, res) => {
 };
 
 export const callNextPatient = async (req, res) => {
+  const { clinic } = req.body;
+
+  if (!clinic) {
+    return res.status(400).json({ success: false, message: "Clinic is required." });
+  }
+
+  try {
+    const todayStart = getStartOfDay();
+    const todayEnd = getEndOfDay();
+
+    const clinicRecord = await prisma.clinic.findUnique({
+      where: { name: clinic },
+      select: { id: true, name: true }
+    });
+
+    if (!clinicRecord) {
+      return res.status(404).json({ success: false, message: `Clinic "${clinic}" not found.` });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const currentServingPromise = tx.token.findFirst({
+        where: {
+          clinicId: clinicRecord.id,
+          status: 'SERVING',
+          appointmentDate: { gte: todayStart, lte: todayEnd }
+        },
+        select: { id: true, tokenNumber: true }
+      });
+
+      const nextPatientPromise = tx.token.findFirst({
+        where: {
+          clinicId: clinicRecord.id,
+          status: 'WAITING',
+          appointmentDate: { gte: todayStart, lte: todayEnd }
+        },
+        orderBy: { tokenNumber: 'asc' },
+        select: {
+          id: true,
+          tokenNumber: true,
+          reasonForVisit: true,
+          consultationMode: true,
+          patient: {
+            select: {
+              id: true,
+              name: true,
+              phone: true
+            }
+          }
+        }
+      });
+
+      const [currentServing, nextPatientToken] = await Promise.all([
+        currentServingPromise,
+        nextPatientPromise
+      ]);
+
+      let previousTokenNumber = null;
+      if (currentServing) {
+        const completed = await tx.token.updateMany({
+          where: { id: currentServing.id, status: 'SERVING' },
+          data: { status: 'COMPLETED' }
+        });
+
+        if (completed.count > 0) {
+          previousTokenNumber = currentServing.tokenNumber;
+        }
+      }
+
+      if (!nextPatientToken) {
+        return {
+          success: true,
+          message: "No more patients are waiting in the queue.",
+          data: {
+            previousCompleted: previousTokenNumber,
+            nextServing: null,
+            currentToken: null,
+            queueUpdated: true,
+            waiting: 0,
+            estimatedTime: "0 mins",
+            queuePatch: {
+              previousCompleted: previousTokenNumber,
+              nextServing: null
+            }
+          }
+        };
+      }
+
+      const promoted = await tx.token.updateMany({
+        where: { id: nextPatientToken.id, status: 'WAITING' },
+        data: { status: 'SERVING' }
+      });
+
+      if (promoted.count === 0) {
+        throw new Error('Next waiting token was already updated by another request.');
+      }
+
+      const waitingCount = await tx.token.count({
+        where: {
+          clinicId: clinicRecord.id,
+          status: 'WAITING',
+          appointmentDate: { gte: todayStart, lte: todayEnd }
+        }
+      });
+
+      const nextPatient = {
+        id: nextPatientToken.patient.id,
+        tokenNumber: nextPatientToken.tokenNumber,
+        name: nextPatientToken.patient.name,
+        status: 'SERVING',
+        clinic: clinicRecord.name,
+        phone: nextPatientToken.patient.phone,
+        reason: nextPatientToken.reasonForVisit,
+        consultationMode: nextPatientToken.consultationMode || null
+      };
+
+      return {
+        success: true,
+        message: `Calling next patient, Token #${nextPatientToken.tokenNumber}.`,
+        data: {
+          previousCompleted: previousTokenNumber,
+          nextServing: nextPatientToken.tokenNumber,
+          currentToken: nextPatientToken.tokenNumber,
+          queueUpdated: true,
+          waiting: waitingCount,
+          estimatedTime: `${waitingCount * 5} mins`,
+          nextPatient,
+          queuePatch: {
+            previousCompleted: previousTokenNumber,
+            nextServing: nextPatientToken.tokenNumber
+          }
+        }
+      };
+    });
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('[callNextPatient] Error:', error.message);
+    return res.status(500).json({ success: false, message: "Internal Server Error.", error: error.message });
+  }
+};
+
+const callNextPatientLegacy = async (req, res) => {
   const { clinic } = req.body;
   
   console.log('[callNextPatient] ============ START ============');

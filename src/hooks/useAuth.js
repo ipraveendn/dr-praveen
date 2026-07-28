@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { apiRequest } from '../utils/api'
 
 /**
  * Custom hook to protect dashboard routes with token authentication
@@ -37,10 +38,25 @@ export const useAuth = (role) => {
     console.log(`[AUTH] User authenticated as: ${username} (${storedRole})`)
   }, [navigate, role])
 
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      navigate('/login')
+    }
+
+    window.addEventListener('auth:session-expired', handleSessionExpired)
+    return () => window.removeEventListener('auth:session-expired', handleSessionExpired)
+  }, [navigate])
+
   /**
    * Logout function - clears token and redirects to login
    */
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await apiRequest('/auth/logout', { method: 'POST' })
+    } catch (error) {
+      console.warn('[AUTH] Logout request failed; clearing local session anyway.', error)
+    }
+
     localStorage.removeItem('token')
     localStorage.removeItem('drp_role')
     localStorage.removeItem('username')

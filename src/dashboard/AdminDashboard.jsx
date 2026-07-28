@@ -30,6 +30,37 @@ function buildQueueState(payload) {
   }
 }
 
+function applyCallNextResult(previousState, payload) {
+  if (!previousState || !payload?.queuePatch) return null
+
+  const previousCompleted = payload.queuePatch.previousCompleted
+  const nextServing = payload.queuePatch.nextServing
+  const nextPatient = payload.nextPatient ? normalizePatient(payload.nextPatient) : null
+
+  const existingPatients = Array.isArray(previousState.patients) ? previousState.patients : []
+  const patients = existingPatients.map(patient => {
+    const tokenNumber = Number(patient.tokenNumber)
+
+    if (previousCompleted && tokenNumber === Number(previousCompleted)) {
+      return { ...patient, status: 'COMPLETED' }
+    }
+
+    if (nextServing && tokenNumber === Number(nextServing)) {
+      return { ...(nextPatient || patient), tokenNumber, status: 'SERVING' }
+    }
+
+    return patient
+  })
+
+  return {
+    ...previousState,
+    currentToken: payload.currentToken ?? nextServing ?? null,
+    waiting: payload.waiting ?? patients.filter(p => p.status === 'WAITING').length,
+    estimatedTime: payload.estimatedTime || previousState.estimatedTime,
+    patients,
+  }
+}
+
 export default function AdminDashboard() {
   const navigate = useNavigate()
   const { logout } = useAuth('admin')
@@ -156,6 +187,8 @@ export default function AdminDashboard() {
       
       if (response?.data?.patients && Array.isArray(response.data.patients)) {
         setQueueData(buildQueueState(response.data))
+      } else if (response?.data?.queuePatch) {
+        setQueueData(current => applyCallNextResult(current, response.data) || current)
       } else {
         await refreshQueue(true)
       }

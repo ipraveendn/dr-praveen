@@ -17,6 +17,19 @@ model User {
   updatedAt DateTime? @default(now()) @updatedAt @db.Timestamp(6)
 }
 
+model RefreshSession {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username  String
+  role      String
+  tokenHash String    @unique
+  expiresAt DateTime  @db.Timestamp(6)
+  revokedAt DateTime? @db.Timestamp(6)
+  createdAt DateTime? @default(now()) @db.Timestamp(6)
+  updatedAt DateTime? @default(now()) @updatedAt @db.Timestamp(6)
+
+  @@index([username, revokedAt, expiresAt], map: "idx_refresh_session_user_active")
+}
+
 model Clinic {
   id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name      String    @unique
@@ -62,6 +75,7 @@ model Token {
 
   @@unique([tokenNumber, appointmentDate], map: "unique_daily_token")
   @@index([clinicId(sort: Desc), appointmentDate(sort: Desc)], map: "idx_token_clinic_appointmentdate")
+  @@index([clinicId, status, appointmentDate, tokenNumber], map: "idx_token_queue_next")
 }
 
 enum TokenStatus {

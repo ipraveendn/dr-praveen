@@ -14,6 +14,7 @@ const API_TIMEOUT = config.API_TIMEOUT;
 // Cache for GET requests (simple in-memory cache)
 const requestCache = new Map()
 const pendingRequests = new Map()
+let refreshPromise = null
 
 const CACHE_DURATION = 100 // 100ms - very short cache to prevent stale data
 const CACHE_WHITELIST = [] // Queue endpoints must always be fresh after mutations
@@ -41,6 +42,78 @@ function invalidateCache(url) {
     if (key.includes(url)) {
       requestCache.delete(key)
     }
+  }
+}
+
+function clearStoredAuth() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('drp_role')
+  localStorage.removeItem('username')
+  window.dispatchEvent(new CustomEvent('auth:session-expired'))
+}
+
+async function refreshAccessToken() {
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      })
+
+      let data = null
+      try {
+        data = await response.json()
+      } catch {
+        // Keep data null; the status check below will produce the user-facing error.
+      }
+
+      if (!response.ok || !data?.token) {
+        clearStoredAuth()
+        throw new Error(data?.message || 'Session expired. Please log in again.')
+      }
+
+      localStorage.setItem('token', data.token)
+      if (data.role) {
+        localStorage.setItem('drp_role', data.role)
+        localStorage.setItem('username', data.role)
+      }
+
+      return data.token
+    })().finally(() => {
+      refreshPromise = null
+    })
+  }
+
+  return refreshPromise
+}
+
+async function responseHasExpiredToken(response) {
+  if (response.status !== 401) return false
+
+  try {
+    const data = await response.clone().json()
+    return data?.code === 'TOKEN_EXPIRED'
+  } catch {
+    return false
+  }
+}
+
+async function fetchWithTimeout(fullUrl, finalOptions) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT)
+
+  try {
+    const response = await fetch(fullUrl, {
+      ...finalOptions,
+      credentials: finalOptions.credentials || 'include',
+      signal: controller.signal
+    })
+    clearTimeout(timeoutId)
+    return response
+  } catch (error) {
+    clearTimeout(timeoutId)
+    throw error
   }
 }
 
@@ -86,16 +159,24 @@ export async function apiFetch(url, options = {}) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const finalOptions = { ...options, headers };
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+  const finalOptions = { ...options, headers, credentials: options.credentials || 'include' };
 
   // Create the fetch promise
   const fetchPromise = (async () => {
     try {
-      const response = await fetch(fullUrl, { ...finalOptions, signal: controller.signal });
-      clearTimeout(timeoutId);
+      let response = await fetchWithTimeout(fullUrl, finalOptions);
+
+      const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/refresh')
+      if (!isAuthEndpoint && await responseHasExpiredToken(response)) {
+        const newToken = await refreshAccessToken()
+        response = await fetchWithTimeout(fullUrl, {
+          ...finalOptions,
+          headers: {
+            ...headers,
+            Authorization: `Bearer ${newToken}`
+          }
+        })
+      }
       
       // CRITICAL: Invalidate cache after successful mutations on queue endpoints
       if (response.ok && (method === 'POST' || method === 'PATCH') && url.includes('/queue')) {
@@ -121,10 +202,12 @@ export async function apiFetch(url, options = {}) {
       // Always return a clone to prevent stream consumption issues with deduplication
       return response.clone();
     } catch (error) {
-      clearTimeout(timeoutId);
       console.error(`[API FETCH ERROR] ${fullUrl}:`, error);
       if (error.name === 'AbortError') {
         throw new Error('Request timed out. Please check your connection and try again.');
+      }
+      if (error.message?.includes('Session expired')) {
+        throw error
       }
       throw new Error("Server temporarily unavailable. Please try again.");
     } finally {
