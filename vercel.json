@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/google1836d6fa794341c0.html",
-      "destination": "/google1836d6fa794341c0.html"
+      "destination": "/api/google1836d6fa794341c0"
     }
   ],
   "routes": [
