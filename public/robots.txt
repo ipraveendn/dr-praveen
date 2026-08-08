@@ -49,4 +49,4 @@ User-agent: DotBot
 Disallow: /
 
 # Sitemap file location
-Sitemap: https://drpraveenramachandra.com/sitemap.xml
+Sitemap: https://www.drpraveenramachandra.com/sitemap.xml

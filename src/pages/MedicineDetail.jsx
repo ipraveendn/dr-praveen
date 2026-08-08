@@ -60,7 +60,7 @@ export default function MedicineDetail() {
   // SEO Meta tags
   const pageTitle = `${medicine.name} | ${category} | Dr. Praveen's Pharmacy`
   const pageDescription = `${medicine.name} - ${medicine.details}. Available through Dr. Praveen Ramachandra's pharmacy service. Get home delivery of ${medicine.name}.`
-  const canonicalUrl = `https://drpraveenramachandra.com/pharmacy/${slug}`
+  const canonicalUrl = `https://www.drpraveenramachandra.com/pharmacy/${slug}`
 
   return (
     <>

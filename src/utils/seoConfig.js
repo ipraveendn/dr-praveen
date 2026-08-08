@@ -8,7 +8,7 @@
 import { DOCTOR as SITE_DOCTOR } from '../data/content'
 
 export const SITE_URL = import.meta.env.PROD 
-  ? 'https://drpraveenramachandra.com'
+  ? 'https://www.drpraveenramachandra.com'
   : 'http://localhost:5173'
 
 const DOCTOR = {
