@@ -14,6 +14,7 @@ import About from './pages/About'
 import Services from './pages/Services'
 import Clinics from './pages/Clinics'
 import Pharmacy from './pages/Pharmacy'
+import MedicineDetail from './pages/MedicineDetail'
 import Laboratory from './pages/Laboratory'
 import Queue from './pages/Queue'
 import Track from './pages/Track'
@@ -120,6 +121,7 @@ export default function App() {
           <Route path="/services" element={<Services />} />
           <Route path="/clinics" element={<Clinics />} />
           <Route path="/pharmacy" element={<Pharmacy />} />
+          <Route path="/pharmacy/:slug" element={<MedicineDetail />} />
           <Route path="/laboratory" element={<Laboratory />} />
           <Route path="/queue" element={<Queue />} />
           <Route path="/track" element={<Track />} />
