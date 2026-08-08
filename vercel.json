@@ -2,6 +2,10 @@
   "routes": [
     { "handle": "filesystem" },
     {
+      "src": "/google.*\\.html",
+      "dest": "/$1"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }
