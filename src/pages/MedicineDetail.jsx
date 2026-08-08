@@ -67,7 +67,7 @@ export default function MedicineDetail() {
       <SEOMeta 
         title={pageTitle}
         description={pageDescription}
-        canonicalUrl={canonicalUrl}
+        canonical={canonicalUrl}
       />
       
       {/* Structured Data - Product */}
