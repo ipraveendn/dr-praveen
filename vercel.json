@@ -1,10 +1,12 @@
 {
+  "rewrites": [
+    {
+      "source": "/google1836d6fa794341c0.html",
+      "destination": "/google1836d6fa794341c0.html"
+    }
+  ],
   "routes": [
     { "handle": "filesystem" },
-    {
-      "src": "/google1836d6fa794341c0\\.html$",
-      "continue": true
-    },
     {
       "src": "/(.*)",
       "dest": "/index.html"
