@@ -8,6 +8,7 @@ export default function Pharmacy() {
   const [requestStatus, setRequestStatus] = useState('')
   const [requestError, setRequestError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [medicineSearch, setMedicineSearch] = useState('')
 
   const pharmacyCatalog = [
     {
@@ -126,6 +127,21 @@ export default function Pharmacy() {
       ]
     },
   ]
+
+  const filteredCatalog = pharmacyCatalog.map((category) => {
+    const lowerQuery = medicineSearch.trim().toLowerCase()
+
+    if (!lowerQuery) return category
+
+    const filteredItems = category.items.filter((item) => {
+      return item.name.toLowerCase().includes(lowerQuery) || item.details.toLowerCase().includes(lowerQuery)
+    })
+
+    return {
+      ...category,
+      items: filteredItems
+    }
+  }).filter((category) => category.items.length > 0)
 
   const handleSubmit = async () => {
     setRequestError('')
@@ -372,68 +388,126 @@ export default function Pharmacy() {
         `}</style>
 
         {/* MEDICINE CATALOG SECTION */}
-        <section style={{ padding: '60px 5%', background: '#F8FAFA' }}>
+        <section style={{ padding: '70px 5%', background: '#F8FAFA' }}>
           <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-            <h2 style={{
-              fontFamily: "'Cormorant Garamond',serif",
-              fontSize: '32px',
-              textAlign: 'center',
-              marginBottom: '24px',
-              color: '#0A1628'
-            }}>
-              Pharmacy Medicines & Supplements
-            </h2>
-            <p style={{
-              textAlign: 'center',
-              color: '#64748B',
-              maxWidth: '760px',
-              margin: '0 auto 40px',
-              lineHeight: '1.8',
-              fontSize: '15px'
-            }}>
-              Browse the pharmacy categories below to view our most requested medicines, nutritionals, and therapy support products.
-            </p>
+            <div style={{ textAlign: 'center', marginBottom: '36px' }}>
+              <p style={{
+                color: '#0B7B6F',
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                fontSize: '14px',
+                margin: '0 0 12px'
+              }}>
+                Premium Pharmacy Catalog
+              </p>
+              <h2 style={{
+                fontFamily: "'Cormorant Garamond',serif",
+                fontSize: 'clamp(40px, 4vw, 54px)',
+                lineHeight: '1.05',
+                color: '#0A1628',
+                margin: '0 auto 18px',
+                maxWidth: '760px'
+              }}>
+                Discover medicines, supplements, and therapy support products that meet every care need.
+              </h2>
+              <p style={{
+                textAlign: 'center',
+                color: '#525962',
+                maxWidth: '760px',
+                margin: '0 auto',
+                lineHeight: '1.8',
+                fontSize: '16px'
+              }}>
+                Search by medicine name or ingredient and explore curated categories for patients seeking high-quality pharmacy delivery.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '40px' }}>
+              <div style={{ width: '100%', maxWidth: '640px' }}>
+                <input
+                  type="search"
+                  value={medicineSearch}
+                  onChange={(e) => setMedicineSearch(e.target.value)}
+                  placeholder="Search medicines, ingredients, or categories..."
+                  style={{
+                    width: '100%',
+                    padding: '18px 22px',
+                    borderRadius: '14px',
+                    border: '1px solid #D8E5E3',
+                    fontSize: '15px',
+                    color: '#0A1628',
+                    outline: 'none',
+                    boxShadow: '0 12px 30px rgba(11, 123, 111, 0.08)',
+                    background: '#fff'
+                  }}
+                />
+              </div>
+            </div>
 
             <div style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
               gap: '24px'
             }}>
-              {pharmacyCatalog.map((category, index) => (
+              {filteredCatalog.map((category, index) => (
                 <div key={index} style={{
-                  background: '#fff',
-                  borderRadius: '20px',
-                  border: '1px solid #E2EEEC',
+                  background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FCFB 100%)',
+                  borderRadius: '24px',
+                  border: '1px solid rgba(11, 123, 111, 0.12)',
                   padding: '28px',
-                  boxShadow: '0 8px 24px rgba(15, 63, 74, 0.06)'
+                  boxShadow: '0 20px 50px rgba(11, 123, 111, 0.08)'
                 }}>
-                  <h3 style={{
-                    fontSize: '20px',
-                    marginBottom: '18px',
-                    color: '#0A1628',
-                    fontWeight: '700'
-                  }}>
-                    {category.title}
-                  </h3>
-                  <ul style={{
-                    listStyle: 'none',
-                    padding: 0,
-                    margin: 0,
-                    display: 'grid',
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '20px',
                     gap: '12px'
                   }}>
+                    <div>
+                      <h3 style={{
+                        fontSize: '22px',
+                        margin: 0,
+                        color: '#0A1628',
+                        letterSpacing: '-0.02em'
+                      }}>
+                        {category.title}
+                      </h3>
+                      <div style={{ fontSize: '13px', color: '#567C73', marginTop: '8px' }}>
+                        {category.items.length} product{category.items.length !== 1 ? 's' : ''}
+                      </div>
+                    </div>
+                    <div style={{
+                      padding: '8px 14px',
+                      borderRadius: '999px',
+                      background: '#E9FFFA',
+                      color: '#0B7B6F',
+                      fontSize: '13px',
+                      fontWeight: 700
+                    }}>
+                      {category.title.split(' ')[0]}
+                    </div>
+                  </div>
+
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                     {category.items.map((item, itemIndex) => (
                       <li key={itemIndex} style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr auto',
-                        gap: '12px',
-                        alignItems: 'baseline',
-                        padding: '12px 0',
-                        borderBottom: itemIndex !== category.items.length - 1 ? '1px solid #E8F0F2' : 'none'
+                        padding: '18px 0',
+                        borderBottom: itemIndex !== category.items.length - 1 ? '1px solid rgba(11, 123, 111, 0.08)' : 'none'
                       }}>
-                        <div>
-                          <div style={{ fontWeight: '700', color: '#0A1628' }}>{item.name}</div>
-                          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>{item.details}</div>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                          <div style={{
+                            width: '10px',
+                            height: '10px',
+                            marginTop: '8px',
+                            borderRadius: '50%',
+                            background: '#0B7B6F',
+                            flexShrink: 0
+                          }} />
+                          <div>
+                            <div style={{ fontSize: '15px', fontWeight: 700, color: '#0A1628' }}>{item.name}</div>
+                            <div style={{ fontSize: '14px', color: '#5F6D70', marginTop: '6px' }}>{item.details}</div>
+                          </div>
                         </div>
                       </li>
                     ))}
@@ -441,6 +515,17 @@ export default function Pharmacy() {
                 </div>
               ))}
             </div>
+
+            {filteredCatalog.length === 0 && (
+              <div style={{
+                marginTop: '24px',
+                textAlign: 'center',
+                color: '#4B5563',
+                fontSize: '15px'
+              }}>
+                No medicines matched your search. Try a different name, ingredient, or category.
+              </div>
+            )}
           </div>
         </section>
 
