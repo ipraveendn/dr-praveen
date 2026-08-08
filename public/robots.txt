@@ -48,7 +48,5 @@ User-agent: SemrushBot
 User-agent: DotBot
 Disallow: /
 
-# Sitemaps location
+# Sitemap file location
 Sitemap: https://drpraveenramachandra.com/sitemap.xml
-Sitemap: https://drpraveenramachandra.com/sitemap-pages.xml
-Sitemap: https://drpraveenramachandra.com/sitemap-blog.xml

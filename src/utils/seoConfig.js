@@ -66,6 +66,14 @@ export const SEO_PAGES = {
     type: 'website',
     noindex: true, // Don't index dashboard
   },
+  pharmacy: {
+    title: 'Pharmacy & Medicine Delivery | Dr. Praveen Ramachandra',
+    description: 'Online pharmacy service for home delivery of diabetes, hypertension, thyroid and wellness medicines in Bengaluru. Upload your prescription and get fast delivery of ROSARA, OMSARA, GUAMET, TUFORMIN and more.',
+    path: '/pharmacy',
+    image: `${SITE_URL}/og-pharmacy.png`,
+    keywords: 'online pharmacy Bengaluru, medicine home delivery, ROSARA 5, ROSUPLUS 10, OMSARA 20, D FLOZIN 10, GUAMET G1, TUFORMIN G 4/500, MEEMOX 625, THYROPLUS, nutrition supplements, diabetic medicine, hypertension treatment',
+    type: 'website',
+  },
 }
 
 /**

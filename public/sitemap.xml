@@ -63,6 +63,18 @@
     </image:image>
   </url>
 
+  <!-- Pharmacy Page -->
+  <url>
+    <loc>https://drpraveenramachandra.com/pharmacy</loc>
+    <lastmod>2026-08-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://drpraveenramachandra.com/og-pharmacy.png</image:loc>
+      <image:title>Pharmacy Service & Medicine Delivery</image:title>
+    </image:image>
+  </url>
+
   <!-- Blog Listing Page -->
   <url>
     <loc>https://drpraveenramachandra.com/blog</loc>

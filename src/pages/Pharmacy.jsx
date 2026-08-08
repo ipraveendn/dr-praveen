@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Helmet } from 'react-helmet-async'
 import { apiRequest } from '../utils/api'
+import SEOMeta from '../components/SEOMeta'
 
 export default function Pharmacy() {
   const [prescriptionFile, setPrescriptionFile] = useState(null)
@@ -184,9 +184,7 @@ export default function Pharmacy() {
 
   return (
     <>
-      <Helmet>
-        <title>Pharmacy | Dr. Praveen Ramachandra</title>
-      </Helmet>
+      <SEOMeta pageKey="pharmacy" structuredData="MedicalBusiness" />
 
       <div style={{ paddingTop: '72px' }}>
         {/* HEADER */}
