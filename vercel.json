@@ -2,8 +2,8 @@
   "routes": [
     { "handle": "filesystem" },
     {
-      "src": "/google.*\\.html",
-      "dest": "/$1"
+      "src": "/google1836d6fa794341c0\\.html$",
+      "continue": true
     },
     {
       "src": "/(.*)",
