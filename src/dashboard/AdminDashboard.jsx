@@ -5,7 +5,20 @@ import { useAuth } from '../hooks/useAuth'
 import { apiRequest } from '../utils/api'
 import SEOMeta from '../components/SEOMeta'
 
-const REASONS = ['Diabetes Checkup','Thyroid Consultation','Hormone Imbalance','Obesity/Weight','PCOS / PCOD','Gestational Diabetes','Pediatric Endocrinology','Osteoporosis','Adrenal Disorder','Pituitary Disorder','General Consultation','Other']
+const REASONS = [
+  'Diabetes Checkup',
+  'Thyroid Consultation',
+  'Hormone Imbalance',
+  'Obesity/Weight',
+  'PCOS / PCOD',
+  'Gestational Diabetes',
+  'Pediatric Endocrinology',
+  'Osteoporosis',
+  'Adrenal Disorder',
+  'Pituitary Disorder',
+  'General Consultation',
+  'Other'
+]
 
 function normalizePatient(patient) {
   return {
@@ -65,6 +78,10 @@ export default function AdminDashboard() {
   const navigate = useNavigate()
   const { logout } = useAuth('admin')
 
+  // Top-level Dashboard Tab: 'queue' or 'appointments'
+  const [activeTab, setActiveTab]             = useState('queue')
+
+  // Queue state
   const [clinicId, setClinicId]               = useState('diaplus')
   const [showAdd, setShowAdd]                 = useState(false)
   const [form, setForm]                       = useState({ name: '', phone: '', reason: '' })
@@ -72,29 +89,37 @@ export default function AdminDashboard() {
   const [queueData, setQueueData]             = useState(null)
   const [queueLoading, setQueueLoading]       = useState(true)
   const [completeLoading, setCompleteLoading] = useState(false)
-  const [actionLoading, setActionLoading] = useState(false)
-  const [actionError, setActionError] = useState('')
-  
+  const [actionLoading, setActionLoading]     = useState(false)
+  const [actionError, setActionError]         = useState('')
+
+  // Appointments state
+  const [appointments, setAppointments]       = useState([])
+  const [apptLoading, setApptLoading]         = useState(false)
+  const [apptError, setApptError]             = useState('')
+  const [apptSuccess, setApptSuccess]         = useState('')
+  const [apptFilterClinic, setApptFilterClinic] = useState('all')
+  const [apptFilterDate, setApptFilterDate]   = useState('')
+  const [apptFilterStatus, setApptFilterStatus] = useState('all')
+  const [cancellingId, setCancellingId]       = useState(null)
+
   // Track pending requests to avoid duplicates
   const pendingRequests = useRef({})
   const lastRefreshTime = useRef({})
-  const lastMutationTime = useRef(null) // Track last mutation to prevent auto-refresh interference
+  const lastMutationTime = useRef(null)
 
+  // Fetch Queue Data
   const refreshQueue = useCallback(async (forceRefresh = false) => {
     const cacheKey = `queue_${clinicId}`
     const now = Date.now()
-    
-    // Skip refresh if mutation in progress (within 3 seconds)
+
     if (lastMutationTime.current && now - lastMutationTime.current < 3000 && !forceRefresh) {
       return
     }
-    
-    // Debounce: don't refresh if we just refreshed (within 200ms)
+
     if (!forceRefresh && lastRefreshTime.current[cacheKey] && now - lastRefreshTime.current[cacheKey] < 200) {
       return
     }
-    
-    // Prevent duplicate requests
+
     if (pendingRequests.current[cacheKey]) {
       return
     }
@@ -114,11 +139,71 @@ export default function AdminDashboard() {
     }
   }, [clinicId])
 
-  // Load initial queue data on clinic change
   useEffect(() => {
     setQueueLoading(true)
     refreshQueue(true)
   }, [clinicId, refreshQueue])
+
+  // Fetch Appointments Data
+  const fetchAppointments = useCallback(async () => {
+    setApptLoading(true)
+    setApptError('')
+    try {
+      const params = new URLSearchParams()
+      if (apptFilterClinic && apptFilterClinic !== 'all') {
+        params.append('clinic', apptFilterClinic)
+      }
+      if (apptFilterDate) {
+        params.append('date', apptFilterDate)
+      }
+      if (apptFilterStatus && apptFilterStatus !== 'all') {
+        params.append('status', apptFilterStatus)
+      }
+      const query = params.toString() ? `?${params.toString()}` : ''
+      const response = await apiRequest(`/appointments${query}`)
+      if (response && response.success && Array.isArray(response.data)) {
+        setAppointments(response.data)
+      } else {
+        setAppointments([])
+      }
+    } catch (err) {
+      console.error('[AdminDashboard] Fetch appointments error:', err)
+      setApptError(err.data?.message || err.message || 'Failed to fetch appointments.')
+    } finally {
+      setApptLoading(false)
+    }
+  }, [apptFilterClinic, apptFilterDate, apptFilterStatus])
+
+  useEffect(() => {
+    fetchAppointments()
+  }, [fetchAppointments])
+
+  // Cancel Appointment Action
+  async function handleCancelAppointment(id) {
+    if (!id || cancellingId) return
+    const confirmed = window.confirm('Are you sure you want to cancel this appointment? The 15-minute slot will be immediately freed.')
+    if (!confirmed) return
+
+    setCancellingId(id)
+    setApptError('')
+    setApptSuccess('')
+    try {
+      const response = await apiRequest(`/appointments/${id}/cancel`, {
+        method: 'PATCH'
+      })
+      if (response && response.success) {
+        setApptSuccess(`Appointment #${id.slice(0, 8)} has been cancelled and the slot is released.`)
+        await fetchAppointments()
+      } else {
+        setApptError(response?.message || 'Failed to cancel appointment.')
+      }
+    } catch (err) {
+      console.error('[AdminDashboard] Cancel appointment error:', err)
+      setApptError(err.data?.message || err.message || 'Failed to cancel appointment.')
+    } finally {
+      setCancellingId(null)
+    }
+  }
 
   const apiPatients = Array.isArray(queueData?.patients) ? queueData.patients : []
   const waiting     = apiPatients.filter(p => p.status === 'WAITING')
@@ -134,8 +219,7 @@ export default function AdminDashboard() {
         method: 'POST',
         body: JSON.stringify({ name: form.name, phone: form.phone, reason: form.reason, clinic: clinicId })
       })
-      
-      // Update queue with response data if available
+
       if (response?.data?.patients) {
         setQueueData(buildQueueState(response.data))
       } else {
@@ -155,7 +239,7 @@ export default function AdminDashboard() {
     if (waiting.length === 0 || actionLoading) {
       return
     }
-    
+
     setActionLoading(true)
     setActionError('')
     lastMutationTime.current = Date.now()
@@ -178,13 +262,13 @@ export default function AdminDashboard() {
         return p
       }),
     }))
-    
+
     try {
-      const response = await apiRequest('/queue/next', { 
-        method: 'POST', 
-        body: JSON.stringify({ clinic: clinicId }) 
+      const response = await apiRequest('/queue/next', {
+        method: 'POST',
+        body: JSON.stringify({ clinic: clinicId })
       })
-      
+
       if (response?.data?.patients && Array.isArray(response.data.patients)) {
         setQueueData(buildQueueState(response.data))
       } else if (response?.data?.queuePatch) {
@@ -206,13 +290,13 @@ export default function AdminDashboard() {
     if (!serving?.tokenNumber || completeLoading) {
       return
     }
-    
+
     setCompleteLoading(true)
     setActionError('')
     const servingTokenNumber = Number(serving.tokenNumber)
     lastMutationTime.current = Date.now()
     const previousQueueData = queueData
-    
+
     setQueueData(buildQueueState({
       ...queueData,
       currentToken: null,
@@ -220,13 +304,13 @@ export default function AdminDashboard() {
         Number(p.tokenNumber) === servingTokenNumber ? { ...p, status: 'COMPLETED' } : p
       ),
     }))
-    
+
     try {
       const response = await apiRequest(`/queue/complete/${servingTokenNumber}`, {
         method: 'PATCH',
         body: JSON.stringify({ clinic: clinicId })
       })
-      
+
       if (response?.data?.patients && Array.isArray(response.data.patients)) {
         setQueueData(buildQueueState(response.data))
       } else {
@@ -242,10 +326,6 @@ export default function AdminDashboard() {
     }
   }
 
-  async function removePatient(tokenNumber) {
-    // Not yet supported by backend — no-op
-  }
-
   const inputStyle = {
     width: '100%', padding: '11px 14px',
     border: '1.5px solid #E2EEEC', borderRadius: '9px',
@@ -259,275 +339,541 @@ export default function AdminDashboard() {
     display: 'block', marginBottom: '8px',
   }
 
+  // Appointment counts for quick badges
+  const scheduledCount = appointments.filter(a => a.status === 'CONFIRMED' || a.status === 'PENDING').length
+  const completedCount = appointments.filter(a => a.status === 'COMPLETED').length
+  const cancelledCount = appointments.filter(a => a.status === 'CANCELLED').length
+
   return (
     <>
       <SEOMeta pageKey="admin" />
       <div style={{ minHeight: '100vh', background: '#F0F4F4', fontFamily: "'DM Sans',sans-serif" }}>
 
-      {/* ── HEADER ── */}
-      <div style={{
-        background: '#0A1628', padding: '0 20px', height: '60px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
-        position: 'sticky', top: 0, zIndex: 100,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            width: '34px', height: '34px', borderRadius: '9px',
-            background: 'linear-gradient(135deg,#0B7B6F,#096358)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: "'Cormorant Garamond',serif", fontWeight: '700',
-            color: '#fff', fontSize: '13px', flexShrink: 0,
-          }}>PR</div>
-          <div>
-            <div style={{ color: '#fff', fontWeight: '700', fontSize: '13px', lineHeight: '1.2' }}>Admin Dashboard</div>
-            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px' }}>Queue Management</div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          {CLINICS.map(c => (
-            <button key={c.id} onClick={() => setClinicId(c.id)} style={{
-              padding: '6px 12px', borderRadius: '7px',
-              border: `1.5px solid ${clinicId === c.id ? '#0B7B6F' : 'rgba(255,255,255,0.15)'}`,
-              background: clinicId === c.id ? '#0B7B6F' : 'transparent',
-              color: '#fff', fontSize: '11px', fontWeight: '600',
-              cursor: 'pointer', fontFamily: "'DM Sans',sans-serif",
-            }}>
-              {c.id === 'diaplus' ? 'Diaplus' : 'Thyroplus'}
-            </button>
-          ))}
-          <button onClick={logout} style={{
-            padding: '6px 12px', borderRadius: '7px',
-            border: '1.5px solid rgba(255,255,255,0.15)',
-            background: 'transparent', color: 'rgba(255,255,255,0.6)',
-            fontSize: '11px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif",
-          }}>Logout</button>
-        </div>
-      </div>
-
-      <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
-
-        {actionError && (
-          <div style={{
-            background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C',
-            borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px',
-          }}>
-            {actionError}
-          </div>
-        )}
-
-       
-        <div className="admin-stats" style={{
-          display: 'grid', gridTemplateColumns: 'repeat(4,1fr)',
-          gap: '12px', marginBottom: '20px',
+        {/* ── HEADER ── */}
+        <div style={{
+          background: '#0A1628', padding: '0 20px', height: '64px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          position: 'sticky', top: 0, zIndex: 100,
         }}>
-          {[
-            { label: 'Currently Serving', val: queueLoading ? '...' : (queueData?.currentToken ?? 0), color: '#0A1628' },
-            { label: 'Patients Waiting',  val: queueLoading ? '...' : (queueData?.waiting ?? waiting.length), color: '#F59E0B' },
-            { label: 'Completed Today',   val: completed.length, color: '#0B7B6F' },
-            { label: 'Revenue Today',     val: `₹${revenue.toLocaleString()}`, color: '#0B7B6F' },
-          ].map(s => (
-            <div key={s.label} style={{
-              background: '#fff', borderRadius: '12px', padding: '16px 14px',
-              border: '1px solid #E2EEEC', boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-            }}>
-              <div style={{ fontSize: '10px', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: '6px' }}>{s.label}</div>
-              <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '30px', fontWeight: '700', color: s.color, lineHeight: '1' }}>{s.val}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '34px', height: '34px', borderRadius: '9px',
+              background: 'linear-gradient(135deg,#0B7B6F,#096358)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: "'Cormorant Garamond',serif", fontWeight: '700',
+              color: '#fff', fontSize: '13px', flexShrink: 0,
+            }}>PR</div>
+            <div>
+              <div style={{ color: '#fff', fontWeight: '700', fontSize: '13px', lineHeight: '1.2' }}>Admin Dashboard</div>
+              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px' }}>Healthcare Operations</div>
             </div>
-          ))}
-        </div>
+          </div>
 
-        {/* ── MAIN GRID ── */}
-        <div className="admin-main" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
-
-          {/* LEFT */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-
-            {/* Now Consulting */}
-            <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', border: '1px solid #E2EEEC' }}>
-              <div style={{ fontSize: '10px', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '14px' }}>Now Consulting</div>
-              {serving ? (
-                <div>
-                  <div style={{
-                    background: 'linear-gradient(135deg,#E6F4F2,#EFF7F6)',
-                    borderRadius: '10px', padding: '14px', marginBottom: '14px',
-                    borderLeft: '4px solid #0B7B6F',
+          {/* Navigation Controls */}
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            {activeTab === 'queue' && (
+              <div style={{ display: 'flex', gap: '6px', marginRight: '6px' }}>
+                {CLINICS.map(c => (
+                  <button key={c.id} onClick={() => setClinicId(c.id)} style={{
+                    padding: '6px 12px', borderRadius: '7px',
+                    border: `1.5px solid ${clinicId === c.id ? '#0B7B6F' : 'rgba(255,255,255,0.15)'}`,
+                    background: clinicId === c.id ? '#0B7B6F' : 'transparent',
+                    color: '#fff', fontSize: '11px', fontWeight: '600',
+                    cursor: 'pointer', fontFamily: "'DM Sans',sans-serif",
                   }}>
-                    <div style={{ fontSize: '22px', fontWeight: '800', color: '#0B7B6F', fontFamily: "'Cormorant Garamond',serif" }}>
-                      #{String(serving.tokenNumber).padStart(2, '0')}
-                    </div>
-                    <div style={{ fontWeight: '700', color: '#0A1628', marginTop: '4px', fontSize: '14px' }}>{serving.name}</div>
-                    <div style={{ fontSize: '12px', color: '#64748B' }}>{serving.reason ?? serving.phone}</div>
-                    <div style={{ fontSize: '11px', color: '#0B7B6F', fontWeight: '700', marginTop: '4px' }}>{serving.consultationMode || 'N/A'}</div>
-                  </div>
-                  <button onClick={markDone} disabled={completeLoading} style={{
-                    width: '100%', background: '#0B7B6F', color: '#fff',
-                    border: 'none', borderRadius: '9px', padding: '11px',
-                    fontSize: '13px', fontWeight: '700',
-                    cursor: completeLoading ? 'not-allowed' : 'pointer',
-                    fontFamily: "'DM Sans',sans-serif", opacity: completeLoading ? 0.7 : 1,
-                  }}>
-                    {completeLoading ? 'Completing...' : 'Mark Complete'}
+                    {c.id === 'diaplus' ? 'Diaplus' : 'Thyroplus'}
                   </button>
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center', color: '#94A3B8', fontSize: '13px', padding: '16px 0' }}>No active consultation</div>
-              )}
-            </div>
-
-            {/* Call Next */}
-            <button onClick={callNext} disabled={waiting.length === 0 || actionLoading} style={{
-              background: waiting.length > 0 ? 'linear-gradient(135deg,#0B7B6F,#096358)' : '#E2EEEC',
-              color: waiting.length > 0 ? '#fff' : '#94A3B8',
-              border: 'none', borderRadius: '12px', padding: '16px',
-              fontSize: '14px', fontWeight: '700',
-              cursor: waiting.length > 0 && !actionLoading ? 'pointer' : 'not-allowed',
-              boxShadow: waiting.length > 0 ? '0 4px 16px rgba(11,123,111,0.25)' : 'none',
-              fontFamily: "'DM Sans',sans-serif", transition: '0.2s',
-              opacity: actionLoading ? 0.7 : 1,
-            }}>
-              {actionLoading ? 'Calling next...' : 'Call Next Patient'}
-            </button>
-
-            {/* Add Patient Toggle */}
-            <button onClick={() => setShowAdd(!showAdd)} style={{
-              background: '#fff', color: '#0B7B6F',
-              border: '1.5px solid #B2DDD8', borderRadius: '12px',
-              padding: '13px', fontSize: '13px', fontWeight: '700',
-              cursor: 'pointer', fontFamily: "'DM Sans',sans-serif",
-            }}>
-              {showAdd ? 'Cancel' : '+ Add Patient Manually'}
-            </button>
-
-            {showAdd && (
-              <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', border: '1px solid #E2EEEC' }}>
-                {[
-                  { label: 'Patient Name', key: 'name', type: 'text', ph: 'Full name' },
-                  { label: 'Phone Number', key: 'phone', type: 'tel', ph: '10-digit number' },
-                ].map(f => (
-                  <div key={f.key} style={{ marginBottom: '14px' }}>
-                    <label style={labelStyle}>{f.label}</label>
-                    <input
-                      type={f.type} placeholder={f.ph}
-                      value={form[f.key]}
-                      onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-                      maxLength={f.key === 'phone' ? 10 : undefined}
-                      style={inputStyle}
-                      onFocus={e => e.target.style.borderColor = '#0B7B6F'}
-                      onBlur={e => e.target.style.borderColor = '#E2EEEC'}
-                    />
-                  </div>
                 ))}
-                <div style={{ marginBottom: '14px' }}>
-                  <label style={labelStyle}>Reason</label>
-                  <select value={form.reason} onChange={e => setForm(p => ({ ...p, reason: e.target.value }))} style={{ ...inputStyle }}>
-                    <option value="">Select reason...</option>
-                    {REASONS.map(r => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                </div>
-                <button onClick={addPatient} disabled={adding} style={{
-                  width: '100%', background: '#0B7B6F', color: '#fff',
-                  border: 'none', borderRadius: '9px', padding: '11px',
-                  fontSize: '13px', fontWeight: '700', cursor: 'pointer',
-                  fontFamily: "'DM Sans',sans-serif", opacity: adding ? 0.7 : 1,
-                }}>
-                  {adding ? 'Adding...' : 'Add to Queue'}
-                </button>
               </div>
             )}
+            <button onClick={logout} style={{
+              padding: '6px 12px', borderRadius: '7px',
+              border: '1.5px solid rgba(255,255,255,0.15)',
+              background: 'transparent', color: 'rgba(255,255,255,0.6)',
+              fontSize: '11px', cursor: 'pointer', fontFamily: "'DM Sans',sans-serif",
+            }}>Logout</button>
           </div>
+        </div>
 
-          {/* RIGHT — Queue list */}
-          <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #E2EEEC', overflow: 'hidden' }}>
-            <div style={{ padding: '18px 20px', borderBottom: '1px solid #E2EEEC', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontWeight: '700', color: '#0A1628', fontSize: '14px' }}>Queue Management</div>
-              <div style={{ fontSize: '12px', color: '#64748B' }}>{waiting.length} waiting · {completed.length} done</div>
-            </div>
+        {/* ── SUB-HEADER TABS (Queue vs Appointments) ── */}
+        <div style={{ background: '#fff', borderBottom: '1px solid #E2EEEC', padding: '0 20px' }}>
+          <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', gap: '24px' }}>
+            <button
+              onClick={() => setActiveTab('queue')}
+              style={{
+                background: 'none', border: 'none',
+                padding: '16px 0',
+                borderBottom: activeTab === 'queue' ? '3px solid #0B7B6F' : '3px solid transparent',
+                color: activeTab === 'queue' ? '#0B7B6F' : '#64748B',
+                fontWeight: '700', fontSize: '14px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '8px'
+              }}
+            >
+              <span>🚶 Live Queue Manager</span>
+              <span style={{ fontSize: '11px', background: activeTab === 'queue' ? '#E6F4F2' : '#F1F5F9', color: activeTab === 'queue' ? '#0B7B6F' : '#64748B', padding: '2px 8px', borderRadius: '12px' }}>
+                {waiting.length} waiting
+              </span>
+            </button>
 
-            <div style={{ maxHeight: '460px', overflowY: 'auto' }}>
-              {queueLoading ? (
-                <div style={{ padding: '48px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>
-                  <div>📍 Loading queue data...</div>
-                </div>
-              ) : apiPatients.length === 0 ? (
-                <div style={{ padding: '48px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>No patients yet today</div>
-              ) : apiPatients.map(p => {
-                const pStatus = String(p.status || '').toUpperCase()
-                const isServing = pStatus === 'SERVING'
-                const isCompleted = pStatus === 'COMPLETED'
-                const isWaiting = pStatus === 'WAITING'
-                
-                return (
-                <div key={p.tokenNumber} style={{
-                  padding: '14px 20px', borderBottom: '1px solid #F0F4F4',
-                  display: 'flex', alignItems: 'center', gap: '14px',
-                  background: isServing ? '#E6F4F2' : '#fff',
-                  transition: 'background-color 0.3s ease',
+            <button
+              onClick={() => setActiveTab('appointments')}
+              style={{
+                background: 'none', border: 'none',
+                padding: '16px 0',
+                borderBottom: activeTab === 'appointments' ? '3px solid #0B7B6F' : '3px solid transparent',
+                color: activeTab === 'appointments' ? '#0B7B6F' : '#64748B',
+                fontWeight: '700', fontSize: '14px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '8px'
+              }}
+            >
+              <span>📅 Scheduled Appointments</span>
+              <span style={{ fontSize: '11px', background: activeTab === 'appointments' ? '#E6F4F2' : '#F1F5F9', color: activeTab === 'appointments' ? '#0B7B6F' : '#64748B', padding: '2px 8px', borderRadius: '12px' }}>
+                {scheduledCount} active
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+
+          {/* ════════════════════════════════════════════════ */}
+          {/* TAB 1: LIVE QUEUE MANAGEMENT (Preserved 100%)    */}
+          {/* ════════════════════════════════════════════════ */}
+          {activeTab === 'queue' && (
+            <div>
+              {actionError && (
+                <div style={{
+                  background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C',
+                  borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px',
                 }}>
-                  <div style={{
-                    width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
-                    background: isServing ? 'linear-gradient(135deg,#0B7B6F,#096358)' : isCompleted ? '#E2EEEC' : '#E6F4F2',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontWeight: '800', color: isServing ? '#fff' : '#0B7B6F', fontSize: '13px',
-                    transition: 'background-color 0.3s ease',
+                  {actionError}
+                </div>
+              )}
+
+              {/* Stats Grid */}
+              <div className="admin-stats" style={{
+                display: 'grid', gridTemplateColumns: 'repeat(4,1fr)',
+                gap: '12px', marginBottom: '20px',
+              }}>
+                {[
+                  { label: 'Currently Serving', val: queueLoading ? '...' : (queueData?.currentToken ?? 0), color: '#0A1628' },
+                  { label: 'Patients Waiting',  val: queueLoading ? '...' : (queueData?.waiting ?? waiting.length), color: '#F59E0B' },
+                  { label: 'Completed Today',   val: completed.length, color: '#0B7B6F' },
+                  { label: 'Revenue Today',     val: `₹${revenue.toLocaleString()}`, color: '#0B7B6F' },
+                ].map(s => (
+                  <div key={s.label} style={{
+                    background: '#fff', borderRadius: '12px', padding: '16px 14px',
+                    border: '1px solid #E2EEEC', boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
                   }}>
-                    {String(p.tokenNumber).padStart(2, '0')}
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: '6px' }}>{s.label}</div>
+                    <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '30px', fontWeight: '700', color: s.color, lineHeight: '1' }}>{s.val}</div>
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: '700', color: '#0A1628', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-                    <div style={{ fontSize: '11px', color: '#64748B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {p.reason ?? ''}{p.phone ? ` · ${p.phone}` : ''}
+                ))}
+              </div>
+
+              {/* Main Queue Section */}
+              <div className="admin-main" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
+
+                {/* Left Column */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+                  {/* Now Consulting Card */}
+                  <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', border: '1px solid #E2EEEC' }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '14px' }}>Now Consulting</div>
+                    {serving ? (
+                      <div>
+                        <div style={{
+                          background: 'linear-gradient(135deg,#E6F4F2,#EFF7F6)',
+                          borderRadius: '10px', padding: '14px', marginBottom: '14px',
+                          borderLeft: '4px solid #0B7B6F',
+                        }}>
+                          <div style={{ fontSize: '22px', fontWeight: '800', color: '#0B7B6F', fontFamily: "'Cormorant Garamond',serif" }}>
+                            #{String(serving.tokenNumber).padStart(2, '0')}
+                          </div>
+                          <div style={{ fontWeight: '700', color: '#0A1628', marginTop: '4px', fontSize: '14px' }}>{serving.name}</div>
+                          <div style={{ fontSize: '12px', color: '#64748B' }}>{serving.reason ?? serving.phone}</div>
+                          <div style={{ fontSize: '11px', color: '#0B7B6F', fontWeight: '700', marginTop: '4px' }}>{serving.consultationMode || 'N/A'}</div>
+                        </div>
+                        <button onClick={markDone} disabled={completeLoading} style={{
+                          width: '100%', background: '#0B7B6F', color: '#fff',
+                          border: 'none', borderRadius: '9px', padding: '11px',
+                          fontSize: '13px', fontWeight: '700',
+                          cursor: completeLoading ? 'not-allowed' : 'pointer',
+                          fontFamily: "'DM Sans',sans-serif", opacity: completeLoading ? 0.7 : 1,
+                        }}>
+                          {completeLoading ? 'Completing...' : 'Mark Complete'}
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ textAlign: 'center', color: '#94A3B8', fontSize: '13px', padding: '16px 0' }}>No active consultation</div>
+                    )}
+                  </div>
+
+                  {/* Call Next Button */}
+                  <button onClick={callNext} disabled={waiting.length === 0 || actionLoading} style={{
+                    background: waiting.length > 0 ? 'linear-gradient(135deg,#0B7B6F,#096358)' : '#E2EEEC',
+                    color: waiting.length > 0 ? '#fff' : '#94A3B8',
+                    border: 'none', borderRadius: '12px', padding: '16px',
+                    fontSize: '14px', fontWeight: '700',
+                    cursor: waiting.length > 0 && !actionLoading ? 'pointer' : 'not-allowed',
+                    boxShadow: waiting.length > 0 ? '0 4px 16px rgba(11,123,111,0.25)' : 'none',
+                    fontFamily: "'DM Sans',sans-serif", transition: '0.2s',
+                    opacity: actionLoading ? 0.7 : 1,
+                  }}>
+                    {actionLoading ? 'Calling next...' : 'Call Next Patient'}
+                  </button>
+
+                  {/* Add Patient Toggle */}
+                  <button onClick={() => setShowAdd(!showAdd)} style={{
+                    background: '#fff', color: '#0B7B6F',
+                    border: '1.5px solid #B2DDD8', borderRadius: '12px',
+                    padding: '13px', fontSize: '13px', fontWeight: '700',
+                    cursor: 'pointer', fontFamily: "'DM Sans',sans-serif",
+                  }}>
+                    {showAdd ? 'Cancel' : '+ Add Patient Manually'}
+                  </button>
+
+                  {showAdd && (
+                    <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', border: '1px solid #E2EEEC' }}>
+                      {[
+                        { label: 'Patient Name', key: 'name', type: 'text', ph: 'Full name' },
+                        { label: 'Phone Number', key: 'phone', type: 'tel', ph: '10-digit number' },
+                      ].map(f => (
+                        <div key={f.key} style={{ marginBottom: '14px' }}>
+                          <label style={labelStyle}>{f.label}</label>
+                          <input
+                            type={f.type} placeholder={f.ph}
+                            value={form[f.key]}
+                            onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+                            maxLength={f.key === 'phone' ? 10 : undefined}
+                            style={inputStyle}
+                            onFocus={e => e.target.style.borderColor = '#0B7B6F'}
+                            onBlur={e => e.target.style.borderColor = '#E2EEEC'}
+                          />
+                        </div>
+                      ))}
+                      <div style={{ marginBottom: '14px' }}>
+                        <label style={labelStyle}>Reason</label>
+                        <select value={form.reason} onChange={e => setForm(p => ({ ...p, reason: e.target.value }))} style={{ ...inputStyle }}>
+                          <option value="">Select reason...</option>
+                          {REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+                        </select>
+                      </div>
+                      <button onClick={addPatient} disabled={adding} style={{
+                        width: '100%', background: '#0B7B6F', color: '#fff',
+                        border: 'none', borderRadius: '9px', padding: '11px',
+                        fontSize: '13px', fontWeight: '700', cursor: 'pointer',
+                        fontFamily: "'DM Sans',sans-serif", opacity: adding ? 0.7 : 1,
+                      }}>
+                        {adding ? 'Adding...' : 'Add to Queue'}
+                      </button>
                     </div>
-                    <div style={{ fontSize: '10px', color: '#0B7B6F', fontWeight: '700', marginTop: '2px' }}>{p.consultationMode || 'N/A'}</div>
-                  </div>
-                  <span style={{
-                    padding: '3px 10px', borderRadius: '20px', fontSize: '10px', fontWeight: '700', flexShrink: 0,
-                    background: isServing ? '#0B7B6F' : isCompleted ? '#E2EEEC' : '#FEF3C7',
-                    color: isServing ? '#fff' : isCompleted ? '#64748B' : '#92400E',
-                    transition: 'all 0.3s ease',
-                  }}>
-                    {isServing ? '🟢 Serving' : isCompleted ? '✓ Done' : '⏳ Waiting'}
-                  </span>
-                  {isWaiting && (
-                    <button onClick={() => console.log('Remove not yet implemented')} style={{
-                      background: 'none', border: '1px solid #E2EEEC', borderRadius: '6px',
-                      color: '#94A3B8', cursor: 'pointer', fontSize: '11px',
-                      padding: '3px 8px', fontFamily: "'DM Sans',sans-serif", flexShrink: 0,
-                    }}>Remove</button>
                   )}
                 </div>
-              )})}
-            </div>
 
-            {/* Summary */}
-            <div style={{ padding: '16px 20px', borderTop: '1px solid #E2EEEC', background: '#F8FAFA', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px' }}>
-              {[
-                { label: 'Avg Wait', val: waiting.length > 0 ? `${waiting.length * 10}m` : '0m' },
-                { label: 'Completion Rate', val: apiPatients.length > 0 ? `${Math.round((completed.length / apiPatients.length) * 100)}%` : '0%' },
-                { label: 'Revenue', val: `₹${revenue.toLocaleString()}` },
-              ].map(s => (
-                <div key={s.label} style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '16px', fontWeight: '800', color: '#0B7B6F' }}>{s.val}</div>
-                  <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{s.label}</div>
+                {/* Right Column: Queue List */}
+                <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #E2EEEC', overflow: 'hidden' }}>
+                  <div style={{ padding: '18px 20px', borderBottom: '1px solid #E2EEEC', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontWeight: '700', color: '#0A1628', fontSize: '14px' }}>Queue Management ({clinicId === 'diaplus' ? 'DiaPlus' : 'ThyroPlus'})</div>
+                    <div style={{ fontSize: '12px', color: '#64748B' }}>{waiting.length} waiting · {completed.length} done</div>
+                  </div>
+
+                  <div style={{ maxHeight: '460px', overflowY: 'auto' }}>
+                    {queueLoading ? (
+                      <div style={{ padding: '48px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>
+                        <div>📍 Loading queue data...</div>
+                      </div>
+                    ) : apiPatients.length === 0 ? (
+                      <div style={{ padding: '48px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>No patients in queue today</div>
+                    ) : apiPatients.map(p => {
+                      const pStatus = String(p.status || '').toUpperCase()
+                      const isServing = pStatus === 'SERVING'
+                      const isCompleted = pStatus === 'COMPLETED'
+                      const isWaiting = pStatus === 'WAITING'
+
+                      return (
+                        <div key={p.tokenNumber} style={{
+                          padding: '14px 20px', borderBottom: '1px solid #F0F4F4',
+                          display: 'flex', alignItems: 'center', gap: '14px',
+                          background: isServing ? '#E6F4F2' : '#fff',
+                          transition: 'background-color 0.3s ease',
+                        }}>
+                          <div style={{
+                            width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
+                            background: isServing ? 'linear-gradient(135deg,#0B7B6F,#096358)' : isCompleted ? '#E2EEEC' : '#E6F4F2',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontWeight: '800', color: isServing ? '#fff' : '#0B7B6F', fontSize: '13px',
+                            transition: 'background-color 0.3s ease',
+                          }}>
+                            {String(p.tokenNumber).padStart(2, '0')}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: '700', color: '#0A1628', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                            <div style={{ fontSize: '11px', color: '#64748B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {p.reason ?? ''}{p.phone ? ` · ${p.phone}` : ''}
+                            </div>
+                            <div style={{ fontSize: '10px', color: '#0B7B6F', fontWeight: '700', marginTop: '2px' }}>{p.consultationMode || 'N/A'}</div>
+                          </div>
+                          <span style={{
+                            padding: '3px 10px', borderRadius: '20px', fontSize: '10px', fontWeight: '700', flexShrink: 0,
+                            background: isServing ? '#0B7B6F' : isCompleted ? '#E2EEEC' : '#FEF3C7',
+                            color: isServing ? '#fff' : isCompleted ? '#64748B' : '#92400E',
+                            transition: 'all 0.3s ease',
+                          }}>
+                            {isServing ? '🟢 Serving' : isCompleted ? '✓ Done' : '⏳ Waiting'}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Summary Footer */}
+                  <div style={{ padding: '16px 20px', borderTop: '1px solid #E2EEEC', background: '#F8FAFA', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px' }}>
+                    {[
+                      { label: 'Avg Wait', val: waiting.length > 0 ? `${waiting.length * 10}m` : '0m' },
+                      { label: 'Completion Rate', val: apiPatients.length > 0 ? `${Math.round((completed.length / apiPatients.length) * 100)}%` : '0%' },
+                      { label: 'Revenue', val: `₹${revenue.toLocaleString()}` },
+                    ].map(s => (
+                      <div key={s.label} style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: '16px', fontWeight: '800', color: '#0B7B6F' }}>{s.val}</div>
+                        <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
+
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* ════════════════════════════════════════════════ */}
+          {/* TAB 2: APPOINTMENTS SYSTEM INTEGRATION           */}
+          {/* ════════════════════════════════════════════════ */}
+          {activeTab === 'appointments' && (
+            <div>
+              {/* Status Alert Banners */}
+              {apptSuccess && (
+                <div style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', color: '#065F46', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>✓ {apptSuccess}</span>
+                  <button onClick={() => setApptSuccess('')} style={{ background: 'none', border: 'none', color: '#065F46', cursor: 'pointer', fontWeight: '700' }}>✕</button>
+                </div>
+              )}
+
+              {apptError && (
+                <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>⚠️ {apptError}</span>
+                  <button onClick={() => setApptError('')} style={{ background: 'none', border: 'none', color: '#B91C1C', cursor: 'pointer', fontWeight: '700' }}>✕</button>
+                </div>
+              )}
+
+              {/* Appointment Stats */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+                <div style={{ background: '#fff', borderRadius: '12px', padding: '16px', border: '1px solid #E2EEEC', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                  <div style={{ fontSize: '10px', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: '4px' }}>Total Bookings</div>
+                  <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628' }}>{appointments.length}</div>
+                </div>
+                <div style={{ background: '#fff', borderRadius: '12px', padding: '16px', border: '1px solid #E2EEEC', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                  <div style={{ fontSize: '10px', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: '4px' }}>Scheduled</div>
+                  <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0B7B6F' }}>{scheduledCount}</div>
+                </div>
+                <div style={{ background: '#fff', borderRadius: '12px', padding: '16px', border: '1px solid #E2EEEC', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                  <div style={{ fontSize: '10px', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: '4px' }}>Completed</div>
+                  <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#10B981' }}>{completedCount}</div>
+                </div>
+                <div style={{ background: '#fff', borderRadius: '12px', padding: '16px', border: '1px solid #E2EEEC', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                  <div style={{ fontSize: '10px', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: '4px' }}>Cancelled</div>
+                  <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#EF4444' }}>{cancelledCount}</div>
+                </div>
+              </div>
+
+              {/* Filters Bar */}
+              <div style={{ background: '#fff', borderRadius: '14px', padding: '18px 20px', border: '1px solid #E2EEEC', marginBottom: '20px', display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ flex: '1 1 160px', minWidth: '150px' }}>
+                  <label style={labelStyle}>Filter by Clinic</label>
+                  <select
+                    value={apptFilterClinic}
+                    onChange={e => setApptFilterClinic(e.target.value)}
+                    style={{ ...inputStyle, padding: '9px 12px' }}
+                  >
+                    <option value="all">All Clinics</option>
+                    <option value="diaplus">DiaPlus Clinic</option>
+                    <option value="thyroplus">ThyroPlus Clinic</option>
+                  </select>
+                </div>
+
+                <div style={{ flex: '1 1 160px', minWidth: '150px' }}>
+                  <label style={labelStyle}>Filter by Date</label>
+                  <input
+                    type="date"
+                    value={apptFilterDate}
+                    onChange={e => setApptFilterDate(e.target.value)}
+                    style={{ ...inputStyle, padding: '8px 12px' }}
+                  />
+                </div>
+
+                <div style={{ flex: '1 1 160px', minWidth: '150px' }}>
+                  <label style={labelStyle}>Filter by Status</label>
+                  <select
+                    value={apptFilterStatus}
+                    onChange={e => setApptFilterStatus(e.target.value)}
+                    style={{ ...inputStyle, padding: '9px 12px' }}
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="CONFIRMED">Scheduled (Confirmed)</option>
+                    <option value="COMPLETED">Completed</option>
+                    <option value="CANCELLED">Cancelled</option>
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', alignSelf: 'flex-end', marginTop: 'auto' }}>
+                  <button
+                    onClick={() => {
+                      setApptFilterClinic('all')
+                      setApptFilterDate('')
+                      setApptFilterStatus('all')
+                    }}
+                    style={{
+                      background: 'none', border: '1px solid #CBD5E1', borderRadius: '8px',
+                      padding: '9px 14px', fontSize: '12px', color: '#64748B', cursor: 'pointer'
+                    }}
+                  >
+                    Reset
+                  </button>
+                  <button
+                    onClick={fetchAppointments}
+                    style={{
+                      background: '#0B7B6F', color: '#fff', border: 'none', borderRadius: '8px',
+                      padding: '9px 14px', fontSize: '12px', fontWeight: '700', cursor: 'pointer'
+                    }}
+                  >
+                    🔄 Refresh
+                  </button>
+                </div>
+              </div>
+
+              {/* Appointments List / Table */}
+              <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #E2EEEC', overflow: 'hidden' }}>
+                <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2EEEC', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFA' }}>
+                  <div style={{ fontWeight: '700', color: '#0A1628', fontSize: '14px' }}>Appointments Schedule</div>
+                  <div style={{ fontSize: '12px', color: '#64748B' }}>Showing {appointments.length} appointments</div>
+                </div>
+
+                {apptLoading ? (
+                  <div style={{ padding: '48px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>
+                    <div>🔄 Loading appointments...</div>
+                  </div>
+                ) : appointments.length === 0 ? (
+                  <div style={{ padding: '48px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>
+                    <div>No appointments found for the selected criteria.</div>
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid #E2EEEC', color: '#64748B', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.6px', background: '#F8FAFA' }}>
+                          <th style={{ padding: '12px 16px' }}>Patient</th>
+                          <th style={{ padding: '12px 16px' }}>Date & Time</th>
+                          <th style={{ padding: '12px 16px' }}>Clinic</th>
+                          <th style={{ padding: '12px 16px' }}>Mode</th>
+                          <th style={{ padding: '12px 16px' }}>Payment</th>
+                          <th style={{ padding: '12px 16px' }}>Status</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {appointments.map((appt) => {
+                          const isCancelled = appt.status === 'CANCELLED'
+                          const isCompleted = appt.status === 'COMPLETED'
+                          const isScheduled = appt.status === 'CONFIRMED' || appt.status === 'PENDING'
+
+                          return (
+                            <tr key={appt.id} style={{ borderBottom: '1px solid #F0F4F4', opacity: isCancelled ? 0.6 : 1, transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#F8FAFA'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                              <td style={{ padding: '14px 16px' }}>
+                                <div style={{ fontWeight: '700', color: '#0A1628' }}>{appt.patientName}</div>
+                                <div style={{ fontSize: '11px', color: '#64748B' }}>
+                                  {appt.phone}{appt.email ? ` · ${appt.email}` : ''}{appt.place ? ` (${appt.place})` : ''}
+                                </div>
+                                <div style={{ fontSize: '11px', color: '#0B7B6F', marginTop: '2px' }}>{appt.reason}</div>
+                                <div style={{ fontSize: '9px', color: '#94A3B8', marginTop: '2px', fontFamily: 'monospace' }}>ID: {appt.id.slice(0, 8)}...</div>
+                              </td>
+
+                              <td style={{ padding: '14px 16px' }}>
+                                <div style={{ fontWeight: '700', color: '#0A1628' }}>{appt.appointmentTime12 || appt.appointmentTime}</div>
+                                <div style={{ fontSize: '12px', color: '#64748B' }}>{appt.appointmentDate}</div>
+                              </td>
+
+                              <td style={{ padding: '14px 16px' }}>
+                                <span style={{ fontWeight: '600', color: '#0A1628' }}>{appt.clinic}</span>
+                              </td>
+
+                              <td style={{ padding: '14px 16px' }}>
+                                <span style={{
+                                  padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '700',
+                                  background: appt.consultationMode === 'ONLINE' ? '#EFF6FF' : '#E6F4F2',
+                                  color: appt.consultationMode === 'ONLINE' ? '#1D4ED8' : '#0B7B6F'
+                                }}>
+                                  {appt.consultationMode === 'ONLINE' ? '💻 Online' : '🏥 In-Person'}
+                                </span>
+                              </td>
+
+                              <td style={{ padding: '14px 16px' }}>
+                                <span style={{ fontSize: '12px', color: '#64748B', fontWeight: '500' }}>
+                                  {appt.paymentMethod === 'ONLINE' ? '📱 Online UPI' : '💵 Cash at Clinic'}
+                                </span>
+                              </td>
+
+                              <td style={{ padding: '14px 16px' }}>
+                                <span style={{
+                                  padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700',
+                                  background: isCancelled ? '#FEE2E2' : isCompleted ? '#D1FAE5' : '#E6F4F2',
+                                  color: isCancelled ? '#991B1B' : isCompleted ? '#065F46' : '#0B7B6F'
+                                }}>
+                                  {isCancelled ? '✕ Cancelled' : isCompleted ? '✓ Completed' : '● Scheduled'}
+                                </span>
+                              </td>
+
+                              <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                                {isScheduled ? (
+                                  <button
+                                    onClick={() => handleCancelAppointment(appt.id)}
+                                    disabled={cancellingId === appt.id}
+                                    style={{
+                                      background: 'none', border: '1px solid #FECACA', borderRadius: '6px',
+                                      color: '#DC2626', padding: '5px 10px', fontSize: '11px', fontWeight: '700',
+                                      cursor: cancellingId === appt.id ? 'not-allowed' : 'pointer',
+                                      opacity: cancellingId === appt.id ? 0.6 : 1
+                                    }}
+                                  >
+                                    {cancellingId === appt.id ? 'Cancelling...' : 'Cancel'}
+                                  </button>
+                                ) : (
+                                  <span style={{ color: '#CBD5E1', fontSize: '12px' }}>—</span>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
         </div>
-      </div>
 
-      <style>{`
-        @media (max-width: 768px) {
-          .admin-stats { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
-          .admin-stats > div { padding: 14px 12px !important; }
-          .admin-stats > div > div:first-child { font-size: 9px !important; margin-bottom: 4px !important; }
-          .admin-stats > div > div:last-child { font-size: 24px !important; }
-          .admin-main { grid-template-columns: 1fr !important; gap: 14px !important; }
-          input, select, textarea { font-size: 16px !important; }
-        }
-      `}</style>
+        <style>{`
+          @media (max-width: 768px) {
+            .admin-stats { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
+            .admin-stats > div { padding: 14px 12px !important; }
+            .admin-stats > div > div:first-child { font-size: 9px !important; margin-bottom: 4px !important; }
+            .admin-stats > div > div:last-child { font-size: 24px !important; }
+            .admin-main { grid-template-columns: 1fr !important; gap: 14px !important; }
+            input, select, textarea { font-size: 16px !important; }
+          }
+        `}</style>
       </div>
     </>
   )
