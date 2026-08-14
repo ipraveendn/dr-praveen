@@ -12,6 +12,7 @@ import queueRoutes from './routes/queue.js'
 import paymentRoutes from './routes/payment.js'
 import notificationRoutes from './routes/notifications.js'
 import pharmacyRoutes from './routes/pharmacy.js'
+import appointmentRoutes from './routes/appointments.js'
 
 // Get current directory for ES modules
 const __filename = fileURLToPath(import.meta.url)
@@ -139,6 +140,15 @@ const pharmacyLimiter = rateLimit({
   standardHeaders: true
 })
 
+// Appointment operations - moderate rate limit
+const appointmentLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute window
+  max: 30, // 30 appointment operations per minute
+  message: { success: false, message: "Too many appointment requests, please slow down" },
+  standardHeaders: true,
+  skip: (req) => req.method === 'GET'
+})
+
 // Apply global limiter
 app.use(globalLimiter)
 
@@ -212,6 +222,7 @@ app.get('/', (req, res) => {
 // ============================================
 app.use('/api/auth', authLimiter, authRoutes)
 app.use('/api/queue', queueLimiter, queueRoutes)
+app.use('/api/appointments', appointmentLimiter, appointmentRoutes)
 app.use('/api/payment', paymentLimiter, paymentRoutes)
 app.use('/api/notifications', notificationRoutes)
 app.use('/api/pharmacy', pharmacyLimiter, pharmacyRoutes)
@@ -236,6 +247,7 @@ app.get('/api', (req, res) => {
       health: '/api/health',
       auth: '/auth',
       queue: '/api/queue',
+      appointments: '/api/appointments',
       payment: '/payment'
     },
     documentation: 'See individual route files for endpoint details'

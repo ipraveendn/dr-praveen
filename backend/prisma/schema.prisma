@@ -31,29 +31,31 @@ model RefreshSession {
 }
 
 model Clinic {
-  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name      String    @unique
-  address   String
-  createdAt DateTime? @default(now()) @db.Timestamp(6)
-  updatedAt DateTime? @default(now()) @updatedAt @db.Timestamp(6)
-  tokens    Token[]
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String        @unique
+  address      String
+  createdAt    DateTime?     @default(now()) @db.Timestamp(6)
+  updatedAt    DateTime?     @default(now()) @updatedAt @db.Timestamp(6)
+  tokens       Token[]
+  appointments Appointment[]
 }
 
 model Patient {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name       String
-  phone      String    @unique
-  email      String?
-  place      String?
-  patientId  String?   @unique
-  age        Int?
-  gender     String?
-  reason     String?
-  clinicId   String?   @db.Uuid
-  createdAt  DateTime? @default(now()) @db.Timestamp(6)
-  updatedAt  DateTime? @default(now()) @updatedAt @db.Timestamp(6)
-  clinicName String?
-  tokens     Token[]
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  phone        String        @unique
+  email        String?
+  place        String?
+  patientId    String?       @unique
+  age          Int?
+  gender       String?
+  reason       String?
+  clinicId     String?       @db.Uuid
+  createdAt    DateTime?     @default(now()) @db.Timestamp(6)
+  updatedAt    DateTime?     @default(now()) @updatedAt @db.Timestamp(6)
+  clinicName   String?
+  tokens       Token[]
+  appointments Appointment[]
 
   @@index([phone], map: "idx_patient_phone")
 }
@@ -94,3 +96,35 @@ model PharmacyRequest {
 
   @@map("pharmacy_requests")
 }
+
+model Appointment {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  clinicId         String            @db.Uuid
+  patientId        String            @db.Uuid
+  appointmentDate  DateTime          @db.Date
+  appointmentTime  String
+  consultationMode String
+  status           AppointmentStatus @default(CONFIRMED)
+  paymentMethod    String?
+  reason           String?
+  notes            String?
+  createdAt        DateTime?         @default(now()) @db.Timestamp(6)
+  updatedAt        DateTime?         @default(now()) @updatedAt @db.Timestamp(6)
+  cancelledAt      DateTime?         @db.Timestamp(6)
+
+  clinic           Clinic            @relation(fields: [clinicId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  patient          Patient           @relation(fields: [patientId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([clinicId, appointmentDate], map: "idx_appointment_clinic_date")
+  @@index([patientId], map: "idx_appointment_patient")
+  @@index([status], map: "idx_appointment_status")
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
