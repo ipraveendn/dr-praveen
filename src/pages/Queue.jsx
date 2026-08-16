@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import QRCode from 'qrcode'
-import { CLINICS, DOCTOR } from '../data/content'
+import { CLINICS } from '../data/content'
 import { apiRequest } from '../utils/api'
 import SEOMeta from '../components/SEOMeta'
 
@@ -121,7 +121,7 @@ export default function Queue() {
   const [slotsLoading, setSlotsLoading] = useState(false)
   const [slotsError, setSlotsError] = useState('')
 
-  // Payment states (Option A preserved)
+  // Payment states
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [paymentScreenshot, setPaymentScreenshot] = useState(null)
   const [qrCodeSrc, setQrCodeSrc] = useState('')
@@ -189,9 +189,11 @@ export default function Queue() {
     return () => clearInterval(interval)
   }, [])
 
+  // Fetch slot availability when clinic or date changes
   const fetchAvailability = useCallback(async (targetClinic, targetDate) => {
     if (!targetClinic || !targetDate) return
 
+    // Central Sunday check: Do not fetch or display slots for Sundays
     const dateObj = bookingDates.find(d => d.dateStr === targetDate)
     if (dateObj?.isHoliday || dateObj?.isSunday) {
       setAvailability({
@@ -245,8 +247,10 @@ export default function Queue() {
     return paymentScreenshot !== null
   }
 
+  // Submit appointment booking
   async function bookAppointment() {
     if (loading) return
+
     if (!clinic || !consultationMode || !selectedDate || !selectedSlot || !form.name || !form.phone) {
       setError('Please complete all required fields before confirming.')
       return
@@ -269,6 +273,8 @@ export default function Queue() {
         paymentMethod: paymentMethod === 'online' ? 'ONLINE' : 'CASH'
       }
 
+      console.log('[BOOKING REQUEST] Submitting appointment:', requestBody)
+
       const result = await apiRequest('/appointments/book', {
         method: 'POST',
         body: JSON.stringify(requestBody)
@@ -277,240 +283,219 @@ export default function Queue() {
       console.log('[BOOKING RESPONSE] Received:', result)
 
       if (result && result.success && result.data) {
-        setConfirmedAppointment(result.data)
-        setStep(7)
+        setConfirmedBooking(result.data)
+        setStep(7) // Move to confirmation screen
       } else {
-        setError(result?.message || 'Unable to confirm appointment. Please try again.')
+        throw new Error(result?.message || 'Failed to book appointment.')
       }
     } catch (err) {
       console.error('[BOOKING ERROR]', err)
-      const msg = err.data?.message || err.message || 'Booking failed. Please check slot availability and try again.'
-      setError(msg)
-      if (err.data?.code === 'SLOT_ALREADY_BOOKED') {
+      const errorMsg = err.data?.message || err.message || 'Something went wrong while booking. Please try again.'
+      setError(errorMsg)
+
+      // If slot conflict (409), refresh availability and send user back to slot selection
+      if (err.status === 409 || err.data?.code === 'SLOT_ALREADY_BOOKED') {
         setSelectedSlot(null)
         fetchAvailability(clinic, selectedDate)
+        setStep(5)
       }
     } finally {
       setLoading(false)
     }
   }
 
-  function handleClinicChange(newClinic) {
-    setClinic(newClinic)
-    setSelectedSlot(null)
-    setError('')
-  }
-
   const clinicObj = CLINICS.find(c => c.id === clinic)
+  const stepLabels = ['Clinic', 'Mode', 'Details', 'Date', 'Time Slot', 'Payment']
 
   return (
-    <div className="page-wrapper" style={{ background: '#F8FAFA', minHeight: '100vh' }}>
-      <SEOMeta
-        title="Book Appointment & Live Token Queue — Dr. Praveen Ramakrishnan"
-        description="Book your Endocrinology appointment with Dr. Praveen Ramakrishnan at DiaPlus or ThyroPlus clinics, or track your live queue token in real time."
-        path="/queue"
-      />
+    <>
+      <SEOMeta pageKey="queue" />
 
-      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '120px 24px 80px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <span className="section-label" style={{ display: 'inline-block', marginBottom: '8px' }}>
-            Appointments & Token Tracker
-          </span>
-          <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '42px', fontWeight: '700', color: '#0A1628', marginBottom: '12px' }}>
-            Book Consultation
+      {/* Global In-Flight Modal Loader */}
+      {loading && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(10, 22, 40, 0.6)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: '20px', padding: '36px 32px',
+            maxWidth: '380px', width: '100%', textAlign: 'center',
+            boxShadow: '0 20px 60px rgba(11, 123, 111, 0.25)',
+            border: '1px solid #E2EEEC'
+          }}>
+            <div style={{
+              width: '52px', height: '52px', margin: '0 auto 20px',
+              border: '4px solid #E2EEEC', borderTopColor: '#0B7B6F',
+              borderRadius: '50%', animation: 'bookingSpin 0.8s linear infinite'
+            }} />
+            <h3 style={{
+              fontFamily: "'Cormorant Garamond',serif", fontSize: '24px',
+              fontWeight: '700', color: '#0A1628', marginBottom: '10px'
+            }}>
+              Confirming Appointment
+            </h3>
+            <p style={{ color: '#64748B', fontSize: '14px', lineHeight: '1.6', margin: 0 }}>
+              Securing your 15-minute slot. Please do not refresh or leave this page.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div style={{ paddingTop: '72px', minHeight: '100vh', background: '#F8FAFA' }}>
+
+        {/* Header */}
+        <div style={{ background: 'linear-gradient(135deg,#0A1628,#0F2040)', padding: '60px 5%', textAlign: 'center' }}>
+          <div className="section-tag" style={{ justifyContent: 'center', color: '#0FA898' }}>APPOINTMENT SYSTEM</div>
+          <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 'clamp(32px,4vw,52px)', fontWeight: '700', color: '#fff' }}>
+            Book Your <em style={{ fontStyle: 'italic', color: '#0FA898' }}>Doctor Appointment</em>
           </h1>
-          <p style={{ color: '#64748B', fontSize: '16px', maxWidth: '520px', margin: '0 auto' }}>
-            Schedule an in-person or online video consultation with Dr. Praveen Ramakrishnan
+          <p style={{ color: 'rgba(255,255,255,0.7)', marginTop: '12px', fontSize: '15px' }}>
+            Choose your clinic, consultation mode, and 15-minute time slot with Dr. Praveen Ramachandra.
           </p>
         </div>
 
-        <div style={{ background: '#fff', borderRadius: '20px', padding: '36px', boxShadow: '0 4px 24px rgba(11,123,111,0.08)', border: '1px solid #E2EEEC' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px', position: 'relative' }}>
-              <div style={{ position: 'absolute', top: '16px', left: '20px', right: '20px', height: '2px', background: '#E2EEEC', zIndex: 0 }} />
-              <div style={{ position: 'absolute', top: '16px', left: '20px', width: `${((step - 1) / 6) * 100}%`, height: '2px', background: '#0B7B6F', zIndex: 0, transition: 'width 0.3s' }} />
+        {/* Progress Bar (Steps 1 to 6) */}
+        {step < 7 && (
+          <div className="queue-progress" style={{ background: '#fff', borderBottom: '1px solid #E2EEEC', padding: '14px 5%', display: 'flex', justifyContent: 'center', gap: '8px', alignItems: 'center' }}>
+            {stepLabels.map((s, i) => (
+              <div key={s} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div className="queue-step-circle" style={{
+                  width: '26px', height: '26px', borderRadius: '50%',
+                  background: step > i + 1 ? '#0B7B6F' : step === i + 1 ? '#0B7B6F' : '#E2EEEC',
+                  color: step >= i + 1 ? '#fff' : '#64748B',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '11px', fontWeight: '700'
+                }}>
+                  {step > i + 1 ? '✓' : i + 1}
+                </div>
+                <span className="queue-step-label" style={{
+                  fontSize: '12px',
+                  fontWeight: step === i + 1 ? '700' : '500',
+                  color: step === i + 1 ? '#0A1628' : '#64748B'
+                }}>
+                  {s}
+                </span>
+                {i < stepLabels.length - 1 && <span style={{ color: '#CBD5E1', fontSize: '14px' }}>›</span>}
+              </div>
+            ))}
+          </div>
+        )}
 
-              {['Clinic', 'Mode', 'Details', 'Date', 'Time Slot', 'Payment', 'Confirmed'].map((sName, idx) => {
-                const sNum = idx + 1
-                const isPassed = step > sNum
-                const isCurrent = step === sNum
+        <div className="queue-container" style={{ maxWidth: '580px', margin: '40px auto', padding: '0 5%' }}>
+          <div style={{ background: '#fff', borderRadius: '20px', padding: '36px', boxShadow: '0 4px 24px rgba(11,123,111,0.08)', border: '1px solid #E2EEEC' }}>
 
-                return (
-                  <div key={sName} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', zIndex: 1 }}>
-                    <div style={{
-                      width: '32px', height: '32px', borderRadius: '50%',
-                      background: isPassed ? '#0B7B6F' : isCurrent ? '#0B7B6F' : '#fff',
-                      border: `2px solid ${isPassed || isCurrent ? '#0B7B6F' : '#CBD5E1'}`,
-                      color: isPassed || isCurrent ? '#fff' : '#94A3B8',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '12px', fontWeight: '700',
-                      transition: 'all 0.2s'
-                    }}>
-                      {isPassed ? '✓' : sNum}
-                    </div>
-                    <span style={{ fontSize: '10px', fontWeight: isCurrent ? '700' : '500', color: isCurrent ? '#0B7B6F' : '#94A3B8', marginTop: '6px', textAlign: 'center' }}>
-                      {sName}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-
+            {/* Step 1 — Choose Clinic */}
             {step === 1 && (
               <div>
-                <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>Select Clinic Location</h2>
-                <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '24px' }}>Choose which clinic location you would like to visit</p>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-                  {CLINICS.map(c => {
-                    const isSelected = clinic === c.id
-                    return (
-                      <div
-                        key={c.id}
-                        onClick={() => handleClinicChange(c.id)}
-                        style={{
-                          border: `2px solid ${isSelected ? '#0B7B6F' : '#E2EEEC'}`,
-                          borderRadius: '16px',
-                          padding: '24px 20px',
-                          cursor: 'pointer',
-                          background: isSelected ? '#E6F4F2' : '#fff',
-                          transition: 'all 0.2s',
-                          position: 'relative'
-                        }}
-                      >
-                        {isSelected && (
-                          <span style={{ position: 'absolute', top: '12px', right: '12px', background: '#0B7B6F', color: '#fff', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700' }}>
-                            ✓
-                          </span>
-                        )}
-                        <div style={{ fontSize: '24px', marginBottom: '10px' }}>{c.id === 'diaplus' ? '🏥' : '🩺'}</div>
-                        <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '20px', fontWeight: '700', color: '#0A1628', marginBottom: '4px' }}>{c.name}</h3>
-                        <p style={{ color: '#64748B', fontSize: '13px', marginBottom: '12px' }}>{c.timing}</p>
-                        <div style={{ display: 'inline-block', background: isSelected ? '#0B7B6F' : '#F1F5F9', color: isSelected ? '#fff' : '#64748B', fontSize: '11px', fontWeight: '600', padding: '3px 8px', borderRadius: '6px' }}>
-                          {c.id === 'diaplus' ? 'Afternoon & Evening Slots' : 'Evening Slots'}
-                        </div>
+                <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>Select Clinic</h2>
+                <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '24px' }}>Where would you like to consult Dr. Praveen Ramachandra?</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {CLINICS.map(c => (
+                    <div
+                      key={c.id}
+                      onClick={() => {
+                        setClinic(c.id)
+                        setSelectedSlot(null) // reset selected slot if clinic changed
+                        setStep(2)
+                      }}
+                      style={{
+                        border: `2px solid ${clinic === c.id ? '#0B7B6F' : '#E2EEEC'}`,
+                        borderRadius: '14px',
+                        padding: '20px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        background: clinic === c.id ? '#E6F4F2' : '#fff'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = '#0B7B6F'}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = clinic === c.id ? '#0B7B6F' : '#E2EEEC'}
+                    >
+                      <div style={{ fontWeight: '700', color: '#0A1628', fontSize: '16px', marginBottom: '4px' }}>{c.name}</div>
+                      <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '6px' }}>{c.address}</div>
+                      <div style={{ fontSize: '12px', color: '#0B7B6F', fontWeight: '600' }}>
+                        🕒 {c.id === 'diaplus' ? '1:00 PM – 4:30 PM · 8:30 PM – 10:30 PM' : '6:30 PM – 8:00 PM'}
                       </div>
-                    )
-                  })}
-                </div>
-
-                {error && <p style={{ color: '#ef4444', fontSize: '13px', marginBottom: '16px' }}>⚠️ {error}</p>}
-
-                <div className="action-row" style={{ display: 'flex', gap: '10px' }}>
-                  <button
-                    onClick={() => {
-                      if (!clinic) {
-                        setError('Please select a clinic location.')
-                        return
-                      }
-                      setError('')
-                      setStep(2)
-                    }}
-                    className="btn-primary"
-                    style={{ width: '100%' }}
-                  >
-                    Continue to Consultation Mode →
-                  </button>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
 
+            {/* Step 2 — Consultation Mode */}
             {step === 2 && (
               <div>
                 <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>Consultation Mode</h2>
-                <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '24px' }}>Choose how you would like to consult with Dr. Praveen</p>
+                <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '24px' }}>Select how you prefer to attend your appointment</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div
+                    onClick={() => { setConsultationMode('IN_PERSON'); setStep(3); }}
+                    style={{
+                      border: `2px solid ${consultationMode === 'IN_PERSON' ? '#0B7B6F' : '#E2EEEC'}`,
+                      borderRadius: '14px',
+                      padding: '20px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      background: consultationMode === 'IN_PERSON' ? '#E6F4F2' : '#fff'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor = '#0B7B6F'}
+                    onMouseLeave={e => e.currentTarget.style.borderColor = consultationMode === 'IN_PERSON' ? '#0B7B6F' : '#E2EEEC'}
+                  >
+                    <div style={{ fontWeight: '700', color: '#0A1628', fontSize: '16px', marginBottom: '4px' }}>🏥 In-Person Consultation</div>
+                    <div style={{ fontSize: '12px', color: '#64748B' }}>Visit {clinicObj?.name || 'the clinic'} for direct doctor consultation</div>
+                  </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-                  {[
-                    { id: 'IN_PERSON', title: 'In-Person Consultation', icon: '🏥', desc: `Visit ${clinicObj?.name || 'the clinic'} in person at your scheduled time slot.` },
-                    { id: 'ONLINE', title: 'Online Video Consultation', icon: '💻', desc: 'Consult Dr. Praveen securely via a high-definition video call from home.' },
-                  ].map(m => {
-                    const isSelected = consultationMode === m.id
-                    return (
-                      <div
-                        key={m.id}
-                        onClick={() => setConsultationMode(m.id)}
-                        style={{
-                          border: `2px solid ${isSelected ? '#0B7B6F' : '#E2EEEC'}`,
-                          borderRadius: '16px',
-                          padding: '24px 20px',
-                          cursor: 'pointer',
-                          background: isSelected ? '#E6F4F2' : '#fff',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        <div style={{ fontSize: '28px', marginBottom: '10px' }}>{m.icon}</div>
-                        <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '20px', fontWeight: '700', color: '#0A1628', marginBottom: '6px' }}>{m.title}</h3>
-                        <p style={{ color: '#64748B', fontSize: '13px', lineHeight: '1.5' }}>{m.desc}</p>
-                      </div>
-                    )
-                  })}
+                  <div
+                    onClick={() => { setConsultationMode('ONLINE'); setStep(3); }}
+                    style={{
+                      border: `2px solid ${consultationMode === 'ONLINE' ? '#0B7B6F' : '#E2EEEC'}`,
+                      borderRadius: '14px',
+                      padding: '20px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      background: consultationMode === 'ONLINE' ? '#E6F4F2' : '#fff'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor = '#0B7B6F'}
+                    onMouseLeave={e => e.currentTarget.style.borderColor = consultationMode === 'ONLINE' ? '#0B7B6F' : '#E2EEEC'}
+                  >
+                    <div style={{ fontWeight: '700', color: '#0A1628', fontSize: '16px', marginBottom: '4px' }}>💻 Online Video / Phone Consultation</div>
+                    <div style={{ fontSize: '12px', color: '#64748B' }}>Consult Dr. Praveen Ramachandra remotely from the comfort of your home</div>
+                  </div>
                 </div>
-
-                <div className="action-row" style={{ display: 'flex', gap: '10px' }}>
-                  <button onClick={() => setStep(1)} className="btn-secondary" style={{ flex: 1 }}>← Back</button>
-                  <button onClick={() => setStep(3)} className="btn-primary" style={{ flex: 2 }}>Enter Patient Details →</button>
+                <div style={{ marginTop: '20px' }}>
+                  <button onClick={() => setStep(1)} className="btn-secondary" style={{ width: '100%' }}>← Back to Clinic</button>
                 </div>
               </div>
             )}
 
+            {/* Step 3 — Patient Details */}
             {step === 3 && (
               <div>
                 <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>Patient Details</h2>
-                <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '24px' }}>Please provide the patient's contact and consultation information</p>
+                <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '24px' }}>
+                  Clinic: <strong style={{ color: '#0B7B6F' }}>{clinicObj?.name}</strong> · Mode: <strong style={{ color: '#0B7B6F' }}>{consultationMode === 'ONLINE' ? 'Online' : 'In-Person'}</strong>
+                </p>
 
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#0B7B6F', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>Patient Full Name *</label>
-                  <input
-                    type="text"
-                    placeholder="Enter full name"
-                    value={form.name}
-                    onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-                    style={{ width: '100%', padding: '12px 14px', border: '1.5px solid #E2EEEC', borderRadius: '10px', fontSize: '14px', fontFamily: "'DM Sans',sans-serif", outline: 'none' }}
-                    onFocus={e => e.target.style.borderColor = '#0B7B6F'}
-                    onBlur={e => e.target.style.borderColor = '#E2EEEC'}
-                  />
-                </div>
-
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#0B7B6F', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>Phone Number (10 digits) *</label>
-                  <input
-                    type="tel"
-                    placeholder="10-digit mobile number"
-                    maxLength={10}
-                    value={form.phone}
-                    onChange={e => setForm(p => ({ ...p, phone: e.target.value.replace(/\D/g, '') }))}
-                    style={{ width: '100%', padding: '12px 14px', border: '1.5px solid #E2EEEC', borderRadius: '10px', fontSize: '14px', fontFamily: "'DM Sans',sans-serif", outline: 'none' }}
-                    onFocus={e => e.target.style.borderColor = '#0B7B6F'}
-                    onBlur={e => e.target.style.borderColor = '#E2EEEC'}
-                  />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#0B7B6F', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>Email Address (Optional)</label>
+                {[
+                  { label: 'Full Name *', key: 'name', type: 'text', placeholder: 'Enter your full name' },
+                  { label: 'Phone Number *', key: 'phone', type: 'tel', placeholder: '10-digit mobile number' },
+                  { label: 'Email Address', key: 'email', type: 'email', placeholder: 'Enter your email address' },
+                  { label: 'Place / City', key: 'place', type: 'text', placeholder: 'Enter your city or town' },
+                ].map(f => (
+                  <div key={f.key} style={{ marginBottom: '18px' }}>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#0B7B6F', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>{f.label}</label>
                     <input
-                      type="email"
-                      placeholder="patient@example.com"
-                      value={form.email}
-                      onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+                      type={f.type}
+                      placeholder={f.placeholder}
+                      value={form[f.key]}
+                      maxLength={f.key === 'phone' ? 10 : undefined}
+                      onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
                       style={{ width: '100%', padding: '12px 14px', border: '1.5px solid #E2EEEC', borderRadius: '10px', fontSize: '14px', fontFamily: "'DM Sans',sans-serif", outline: 'none' }}
                       onFocus={e => e.target.style.borderColor = '#0B7B6F'}
                       onBlur={e => e.target.style.borderColor = '#E2EEEC'}
                     />
                   </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#0B7B6F', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>Place / City (Optional)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Bangalore"
-                      value={form.place}
-                      onChange={e => setForm(p => ({ ...p, place: e.target.value }))}
-                      style={{ width: '100%', padding: '12px 14px', border: '1.5px solid #E2EEEC', borderRadius: '10px', fontSize: '14px', fontFamily: "'DM Sans',sans-serif", outline: 'none' }}
-                      onFocus={e => e.target.style.borderColor = '#0B7B6F'}
-                      onBlur={e => e.target.style.borderColor = '#E2EEEC'}
-                    />
-                  </div>
-                </div>
+                ))}
 
                 <div style={{ marginBottom: '24px' }}>
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#0B7B6F', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>Reason for Visit *</label>
@@ -518,18 +503,22 @@ export default function Queue() {
                     value={form.reason}
                     onChange={e => setForm(p => ({ ...p, reason: e.target.value }))}
                     style={{ width: '100%', padding: '12px 14px', border: '1.5px solid #E2EEEC', borderRadius: '10px', fontSize: '14px', fontFamily: "'DM Sans',sans-serif", outline: 'none', background: '#fff' }}
+                    onFocus={e => e.target.style.borderColor = '#0B7B6F'}
+                    onBlur={e => e.target.style.borderColor = '#E2EEEC'}
                   >
                     <option value="">Select reason...</option>
                     {REASONS.map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </div>
 
+                {error && <p style={{ color: '#ef4444', fontSize: '13px', marginBottom: '16px' }}>⚠️ {error}</p>}
+
                 <div className="action-row" style={{ display: 'flex', gap: '10px' }}>
                   <button onClick={() => setStep(2)} className="btn-secondary" style={{ flex: 1 }}>← Back</button>
                   <button
                     onClick={() => {
                       if (!form.name.trim() || !form.phone.trim() || !form.reason) {
-                        setError('Please fill in required fields.')
+                        setError('Please fill in your name, phone number, and reason for visit.')
                         return
                       }
                       if (form.phone.replace(/\D/g, '').length < 10) {
@@ -537,6 +526,7 @@ export default function Queue() {
                         return
                       }
                       setError('')
+                      // Auto-select first non-holiday date if none selected yet
                       if (!selectedDate && bookingDates.length > 0) {
                         const firstOpen = bookingDates.find(d => !d.isHoliday)
                         if (firstOpen) {
@@ -556,10 +546,11 @@ export default function Queue() {
               </div>
             )}
 
+            {/* Step 4 — Select Date */}
             {step === 4 && (
               <div>
                 <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>Select Date</h2>
-                <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '20px' }}>Choose from the next 7 calendar days (Sundays are clinic holidays)</p>
+                <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '20px' }}>Choose from the next 7 calendar days</p>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '10px', marginBottom: '24px' }}>
                   {bookingDates.map(d => {
@@ -573,7 +564,7 @@ export default function Queue() {
                         onClick={() => {
                           if (!isClosed) {
                             setSelectedDate(d.dateStr)
-                            setSelectedSlot(null)
+                            setSelectedSlot(null) // reset slot on date switch
                             setError('')
                           }
                         }}
@@ -634,6 +625,7 @@ export default function Queue() {
               </div>
             )}
 
+            {/* Step 5 — Select Time Slot */}
             {step === 5 && (
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '8px' }}>
@@ -674,9 +666,24 @@ export default function Queue() {
                   </div>
                 ) : availability && availability.slots ? (
                   <div>
+                    {/* Slot Availability Legend */}
+                    <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', fontSize: '12px', color: '#64748B' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ width: '12px', height: '12px', borderRadius: '3px', border: '1.5px solid #0B7B6F', background: '#fff' }} /> Available
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#0B7B6F' }} /> Selected
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#F1F5F9', border: '1px solid #CBD5E1' }} /> Booked / Past
+                      </span>
+                    </div>
+
+                    {/* Slots Grid grouped by Period */}
                     {['Afternoon', 'Evening'].map(period => {
                       const periodSlots = availability.slots.filter(s => s.period === period || (!s.period && period === 'Evening'))
                       if (periodSlots.length === 0) return null
+
                       return (
                         <div key={period} style={{ marginBottom: '20px' }}>
                           <div style={{ fontSize: '12px', fontWeight: '700', color: '#0B7B6F', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>
@@ -686,6 +693,7 @@ export default function Queue() {
                             {periodSlots.map(slot => {
                               const isSelected = selectedSlot?.time24 === slot.time24
                               const isAvailable = slot.available
+
                               return (
                                 <button
                                   key={slot.time24}
@@ -752,123 +760,122 @@ export default function Queue() {
                             {selectedSlot.time12} · {bookingDates.find(d => d.dateStr === selectedDate)?.dateLabel || selectedDate}
                           </div>
                         </div>
-                        <span style={{ fontSize: '12px', color: '#0B7B6F', fontWeight: '700' }}>✓ Ready</span>
+                        <div style={{ fontSize: '12px', color: '#0B7B6F', fontWeight: '600' }}>
+                          {clinicObj?.name}
+                        </div>
                       </div>
                     )}
+
+                    <div className="action-row" style={{ display: 'flex', gap: '10px' }}>
+                      <button onClick={() => setStep(4)} className="btn-secondary" style={{ flex: 1 }}>← Back</button>
+                      <button
+                        onClick={() => {
+                          if (!selectedSlot) {
+                            setError('Please select an appointment time slot.')
+                            return
+                          }
+                          setError('')
+                          setStep(6)
+                        }}
+                        disabled={!selectedSlot}
+                        className="btn-primary"
+                        style={{
+                          flex: 2,
+                          opacity: !selectedSlot ? 0.6 : 1,
+                          cursor: !selectedSlot ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        Proceed to Payment →
+                      </button>
+                    </div>
                   </div>
                 ) : null}
-
-                {error && <p style={{ color: '#ef4444', fontSize: '13px', marginBottom: '16px' }}>⚠️ {error}</p>}
-
-                <div className="action-row" style={{ display: 'flex', gap: '10px' }}>
-                  <button onClick={() => setStep(4)} className="btn-secondary" style={{ flex: 1 }}>← Back</button>
-                  <button
-                    onClick={() => {
-                      if (!selectedSlot) {
-                        setError('Please select an available time slot.')
-                        return
-                      }
-                      setError('')
-                      setStep(6)
-                    }}
-                    disabled={!selectedSlot}
-                    className="btn-primary"
-                    style={{ flex: 2, opacity: selectedSlot ? 1 : 0.6, cursor: selectedSlot ? 'pointer' : 'not-allowed' }}
-                  >
-                    Proceed to Payment →
-                  </button>
-                </div>
               </div>
             )}
 
-            {/* Step 6 — Payment & Final Confirmation (Payment Option A) */}
+            {/* Step 6 — Payment Method */}
             {step === 6 && (
               <div>
-                <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>Payment & Confirm</h2>
-                <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '20px' }}>Review your booking and select payment method</p>
+                <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>Payment Method</h2>
+                <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '24px' }}>Choose your payment mode to confirm booking</p>
 
-                {/* Summary Card */}
-                <div style={{ background: '#F8FAFA', borderRadius: '14px', padding: '18px', border: '1px solid #E2EEEC', marginBottom: '20px' }}>
-                  {[
-                    ['Clinic', clinicObj?.name],
-                    ['Mode', consultationMode === 'ONLINE' ? 'Online Consultation' : 'In-Person Consultation'],
-                    ['Date', bookingDates.find(d => d.dateStr === selectedDate)?.dateLabel || selectedDate],
-                    ['Time Slot', selectedSlot?.time12],
-                    ['Patient Name', form.name],
-                    ['Phone', form.phone],
-                    ['Reason', form.reason],
-                    ['Doctor', form.doctor]
-                  ].map(([label, val]) => (
-                    <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #E2EEEC', fontSize: '13px' }}>
-                      <span style={{ color: '#64748B', fontWeight: '500' }}>{label}</span>
-                      <span style={{ color: '#0A1628', fontWeight: '700' }}>{val}</span>
-                    </div>
-                  ))}
+                {/* Booking Summary Box */}
+                <div style={{ background: '#F8FAFA', border: '1px solid #E2EEEC', borderRadius: '12px', padding: '16px', marginBottom: '24px' }}>
+                  <div style={{ fontWeight: '700', color: '#0A1628', marginBottom: '8px', fontSize: '13px' }}>Appointment Summary</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 12px', fontSize: '13px', color: '#64748B' }}>
+                    <strong>Doctor:</strong> <span>Dr. Praveen Ramachandra</span>
+                    <strong>Clinic:</strong> <span>{clinicObj?.name}</span>
+                    <strong>Date & Time:</strong> <span>{bookingDates.find(d => d.dateStr === selectedDate)?.dateLabel || selectedDate} at {selectedSlot?.time12}</span>
+                    <strong>Mode:</strong> <span>{consultationMode === 'ONLINE' ? 'Online Consultation' : 'In-Person Consultation'}</span>
+                    <strong>Patient:</strong> <span>{form.name} ({form.phone})</span>
+                  </div>
                 </div>
 
-                {/* Payment Option Selector */}
-                <div style={{ marginBottom: '20px' }}>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#0B7B6F', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>
-                    Payment Options
-                  </label>
+                <div style={{ marginBottom: '24px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+                    <div
+                      onClick={() => setPaymentMethod('cash')}
+                      style={{
+                        border: `2px solid ${paymentMethod === 'cash' ? '#0B7B6F' : '#E2EEEC'}`,
+                        borderRadius: '12px',
+                        padding: '16px',
+                        cursor: 'pointer',
+                        background: paymentMethod === 'cash' ? '#E6F4F2' : '#fff',
+                        transition: 'all 0.2s',
+                        textAlign: 'center'
+                      }}
+                    >
+                      <div style={{ fontSize: '20px', marginBottom: '6px' }}>💵</div>
+                      <div style={{ fontWeight: '700', color: '#0A1628', fontSize: '14px' }}>Pay Cash at Clinic</div>
+                      <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>Pay upon arrival</div>
+                    </div>
 
-                  <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                    {['cash', 'online'].map(method => (
-                      <button
-                        key={method}
-                        type="button"
-                        onClick={() => setPaymentMethod(method)}
-                        style={{
-                          flex: '1 1 140px',
-                          padding: '14px',
-                          borderRadius: '12px',
-                          border: paymentMethod === method ? '2px solid #0B7B6F' : '1px solid #E2EEEC',
-                          background: paymentMethod === method ? '#E6F4F2' : '#fff',
-                          color: '#0A1628',
-                          cursor: 'pointer',
-                          fontWeight: '700',
-                          fontSize: '13px',
-                          textAlign: 'center'
-                        }}
-                      >
-                        {method === 'cash' ? '💵 Pay at Clinic' : '📱 Pay Online (UPI QR)'}
-                      </button>
-                    ))}
+                    <div
+                      onClick={() => setPaymentMethod('online')}
+                      style={{
+                        border: `2px solid ${paymentMethod === 'online' ? '#0B7B6F' : '#E2EEEC'}`,
+                        borderRadius: '12px',
+                        padding: '16px',
+                        cursor: 'pointer',
+                        background: paymentMethod === 'online' ? '#E6F4F2' : '#fff',
+                        transition: 'all 0.2s',
+                        textAlign: 'center'
+                      }}
+                    >
+                      <div style={{ fontSize: '20px', marginBottom: '6px' }}>📱</div>
+                      <div style={{ fontWeight: '700', color: '#0A1628', fontSize: '14px' }}>Pay Online via UPI</div>
+                      <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>Scan QR & Upload Screenshot</div>
+                    </div>
                   </div>
 
-                  {paymentMethod === 'cash' && (
-                    <div style={{ background: '#F8FAFA', borderRadius: '12px', padding: '16px', border: '1px solid #E2EEEC', marginBottom: '16px' }}>
-                      <p style={{ fontSize: '13px', color: '#0A1628', fontWeight: '700', marginBottom: '4px' }}>Pay Cash at Clinic</p>
-                      <p style={{ fontSize: '12px', color: '#64748B', lineHeight: '1.6', margin: 0 }}>
-                        Please pay the consultation fee at reception when you arrive for your scheduled appointment.
-                      </p>
-                    </div>
-                  )}
-
+                  {/* QR Code section for Online Payment */}
                   {paymentMethod === 'online' && (
-                    <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', border: '1px solid #E2EEEC', marginBottom: '16px' }}>
-                      <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-                        <div style={{ fontSize: '13px', color: '#0B7B6F', fontWeight: '700', marginBottom: '4px' }}>Scan & Pay with Any UPI App</div>
-                        <div style={{ fontSize: '12px', color: '#64748B' }}>Google Pay, PhonePe, Paytm, BHIM</div>
-                      </div>
+                    <div style={{ background: '#F8FAFA', borderRadius: '14px', padding: '24px', border: '1px solid #E2EEEC', textAlign: 'center', marginBottom: '20px' }}>
+                      <div style={{ fontWeight: '700', color: '#0A1628', marginBottom: '6px', fontSize: '15px' }}>Scan UPI QR Code to Pay</div>
+                      <p style={{ color: '#64748B', fontSize: '13px', marginBottom: '16px' }}>
+                        Scan using GPay, PhonePe, Paytm, or any UPI app
+                      </p>
 
-                      <div style={{ display: 'grid', justifyItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                        <div style={{ width: '200px', height: '200px', borderRadius: '16px', background: '#fff', border: '1px solid #E2EEEC', display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
-                          {qrLoading ? (
-                            <div style={{ color: '#64748B', fontSize: '12px' }}>Generating QR code...</div>
-                          ) : qrError ? (
-                            <div style={{ color: '#dc2626', fontSize: '12px', padding: '10px' }}>{qrError}</div>
-                          ) : (
-                            <img
-                              src={qrCodeSrc}
-                              alt="UPI QR Code"
-                              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                            />
-                          )}
-                        </div>
-                        <div style={{ fontSize: '13px', color: '#0B7B6F', fontWeight: '700' }}>
-                          UPI ID: {clinicObj?.id === 'thyroplus' ? 'BHARATPE09895931868@yesbankltd' : 'paytmqr64bh34@ptys'}
-                        </div>
+                      <div style={{
+                        width: '200px', height: '200px', margin: '0 auto 16px',
+                        background: '#fff', padding: '10px', borderRadius: '12px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.06)', display: 'flex',
+                        alignItems: 'center', justifyContent: 'center'
+                      }}>
+                        {qrLoading ? (
+                          <div style={{ color: '#64748B', fontSize: '12px' }}>Generating QR code...</div>
+                        ) : qrError ? (
+                          <div style={{ color: '#dc2626', fontSize: '12px', padding: '10px' }}>{qrError}</div>
+                        ) : (
+                          <img
+                            src={qrCodeSrc}
+                            alt="UPI QR Code"
+                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                          />
+                        )}
+                      </div>
+                      <div style={{ fontSize: '13px', color: '#0B7B6F', fontWeight: '700', marginBottom: '16px' }}>
+                        UPI ID: {clinicObj?.id === 'thyroplus' ? 'BHARATPE09895931868@yesbankltd' : 'paytmqr64bh34@ptys'}
                       </div>
 
                       <div>
@@ -939,6 +946,7 @@ export default function Queue() {
                 <div style={{ background: '#F8FAFA', borderRadius: '14px', padding: '20px', border: '1px solid #E2EEEC', textAlign: 'left', marginBottom: '24px' }}>
                   {[
                     ['Reference ID', confirmedBooking.appointmentId],
+                    ['Doctor', 'Dr. Praveen Ramachandra'],
                     ['Clinic', confirmedBooking.clinic],
                     ['Patient Name', confirmedBooking.patientName],
                     ['Phone', confirmedBooking.phone],
@@ -980,8 +988,9 @@ export default function Queue() {
 
           </div>
 
-        {/* Live Queue widget underneath */}
-        <LiveQueue data={queueData} />
+          {/* Live Queue widget underneath */}
+          <LiveQueue data={queueData} />
+        </div>
 
         <style>{`
           @keyframes bookingSpin {
@@ -1010,6 +1019,6 @@ export default function Queue() {
           }
         `}</style>
       </div>
-    </div>
+    </>
   )
 }
