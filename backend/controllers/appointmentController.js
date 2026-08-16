@@ -12,6 +12,7 @@ import {
   isValidSlotForClinic,
   getBookingDateWindow,
   validateBookingDate,
+  isClinicHoliday,
   isSlotInPast,
   formatTime12Hour,
   CLINIC_SCHEDULES
@@ -69,10 +70,32 @@ export const getAvailability = async (req, res) => {
       });
     }
 
+    // Check if the requested date is a clinic holiday (Sundays)
+    if (isClinicHoliday(date)) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          clinic: clinicConfig.name,
+          clinicId: clinicConfig.id,
+          date,
+          timezone: 'Asia/Kolkata',
+          isSunday: true,
+          isHoliday: true,
+          isClosed: true,
+          totalSlots: 0,
+          availableCount: 0,
+          bookedCount: 0,
+          slots: [],
+          message: 'The clinic is closed on Sundays (Holiday). Please select an alternate day.'
+        }
+      });
+    }
+
     const dateValidation = validateBookingDate(date);
     if (!dateValidation.valid) {
       return res.status(400).json({
         success: false,
+        code: dateValidation.code || 'INVALID_DATE',
         message: dateValidation.error
       });
     }
@@ -501,6 +524,27 @@ export const getTodaySlots = async (req, res) => {
 
     const todayStr = getISTDateString(new Date());
 
+    // Check if today is a clinic holiday (Sundays)
+    if (isClinicHoliday(todayStr)) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          clinic: clinicConfig.name,
+          clinicId: clinicConfig.id,
+          date: todayStr,
+          timezone: 'Asia/Kolkata',
+          isSunday: true,
+          isHoliday: true,
+          isClosed: true,
+          totalSlots: 0,
+          availableCount: 0,
+          bookedCount: 0,
+          slots: [],
+          message: 'The clinic is closed today (Sunday Holiday). No appointment slots are available.'
+        }
+      });
+    }
+
     // Resolve clinic record in DB
     const clinicRecord = await prisma.clinic.upsert({
       where: { name: clinicConfig.name },
@@ -560,6 +604,9 @@ export const getTodaySlots = async (req, res) => {
         clinicId: clinicConfig.id,
         date: todayStr,
         timezone: 'Asia/Kolkata',
+        isSunday: false,
+        isHoliday: false,
+        isClosed: false,
         totalSlots: slots.length,
         availableCount: slots.filter(s => s.available).length,
         bookedCount: slots.filter(s => s.isBooked).length,
@@ -608,7 +655,16 @@ export const adminBookTodayAppointment = async (req, res) => {
 
   const todayStr = getISTDateString(new Date());
 
-  // 1. Enforce strict same-day rule (Asia/Kolkata)
+  // 1. Enforce strict Sunday / holiday rejection
+  if (isClinicHoliday(todayStr)) {
+    return res.status(400).json({
+      success: false,
+      code: 'CLINIC_CLOSED_SUNDAY',
+      message: 'Cannot create appointment: Clinic is closed on Sundays (Holiday).'
+    });
+  }
+
+  // 2. Enforce strict same-day rule (Asia/Kolkata)
   if (!appointmentDate || appointmentDate !== todayStr) {
     return res.status(400).json({
       success: false,

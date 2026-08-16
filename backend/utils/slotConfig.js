@@ -151,9 +151,36 @@ export function isValidSlotForClinic(clinicIdentifier, time24) {
 }
 
 /**
+ * Checks if a given date string (YYYY-MM-DD) is Sunday in Asia/Kolkata timezone
+ * @param {string} dateStr - "YYYY-MM-DD"
+ * @returns {boolean}
+ */
+export function isSundayInIST(dateStr) {
+  if (!dateStr || typeof dateStr !== 'string') return false;
+  const match = dateStr.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+  // Create Date at noon IST to avoid edge-of-day boundary shifts
+  const d = new Date(`${dateStr.trim()}T12:00:00.000+05:30`);
+  const weekday = new Intl.DateTimeFormat('en-US', {
+    timeZone: IST_TIMEZONE,
+    weekday: 'short'
+  }).format(d);
+  return weekday === 'Sun';
+}
+
+/**
+ * Centralized Clinic Holiday Check (Sundays are clinic holidays in IST)
+ * @param {string} dateStr - "YYYY-MM-DD"
+ * @returns {boolean}
+ */
+export function isClinicHoliday(dateStr) {
+  return isSundayInIST(dateStr);
+}
+
+/**
  * Generates the dynamic 7-day calendar booking window in Asia/Kolkata timezone
  * @param {Date} [referenceDate=new Date()]
- * @returns {Array<{ dateStr: string, displayDay: string, displayDate: string, isToday: boolean }>}
+ * @returns {Array<{ dateStr: string, displayDay: string, displayDate: string, isToday: boolean, isSunday: boolean, isHoliday: boolean, isClosed: boolean }>}
  */
 export function getBookingDateWindow(referenceDate = new Date()) {
   const dates = [];
@@ -175,41 +202,55 @@ export function getBookingDateWindow(referenceDate = new Date()) {
       month: 'short'
     });
 
+    const isSunday = isSundayInIST(dateStr);
+    const isHoliday = isSunday;
+
     dates.push({
       dateStr,
       displayDay: i === 0 ? 'Today' : dayFormatter.format(d),
       displayDate: dateFormatter.format(d),
-      isToday: i === 0
+      isToday: i === 0,
+      isSunday,
+      isHoliday,
+      isClosed: isHoliday
     });
   }
   return dates;
 }
 
 /**
- * Validates if an appointment date string is within the allowed 7-day IST booking window
+ * Validates if an appointment date string is within the allowed 7-day IST booking window and not a holiday
  * @param {string} dateStr - "YYYY-MM-DD"
  * @param {Date} [referenceDate=new Date()]
- * @returns {{ valid: boolean, error?: string }}
+ * @returns {{ valid: boolean, error?: string, code?: string }}
  */
 export function validateBookingDate(dateStr, referenceDate = new Date()) {
   if (!dateStr || typeof dateStr !== 'string') {
-    return { valid: false, error: 'Appointment date is required.' };
+    return { valid: false, error: 'Appointment date is required.', code: 'INVALID_DATE' };
   }
 
   const match = dateStr.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) {
-    return { valid: false, error: 'Invalid date format. Expected YYYY-MM-DD.' };
+    return { valid: false, error: 'Invalid date format. Expected YYYY-MM-DD.', code: 'INVALID_DATE' };
   }
 
   const todayStr = getISTDateString(referenceDate);
   const allowedDates = getBookingDateWindow(referenceDate).map(d => d.dateStr);
 
   if (dateStr < todayStr) {
-    return { valid: false, error: 'Cannot book an appointment for a past date.' };
+    return { valid: false, error: 'Cannot book an appointment for a past date.', code: 'PAST_DATE' };
   }
 
   if (!allowedDates.includes(dateStr)) {
-    return { valid: false, error: 'Date is outside the 7-day booking window.' };
+    return { valid: false, error: 'Date is outside the 7-day booking window.', code: 'OUTSIDE_WINDOW' };
+  }
+
+  if (isClinicHoliday(dateStr)) {
+    return {
+      valid: false,
+      error: 'The clinic is closed on Sundays (Holiday). Please select a Monday through Saturday slot.',
+      code: 'CLINIC_CLOSED_SUNDAY'
+    };
   }
 
   return { valid: true };

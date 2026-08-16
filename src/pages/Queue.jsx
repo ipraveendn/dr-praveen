@@ -43,11 +43,21 @@ function getNext7DaysIST() {
       month: 'short'
     }).format(d)
 
+    const rawWeekday = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Kolkata',
+      weekday: 'short'
+    }).format(d)
+    const isSunday = rawWeekday === 'Sun'
+    const isHoliday = isSunday
+
     dates.push({
       dateStr,
       dayLabel,
       dateLabel,
-      isToday: i === 0
+      isToday: i === 0,
+      isSunday,
+      isHoliday,
+      isClosed: isHoliday
     })
   }
   return dates
@@ -179,9 +189,27 @@ export default function Queue() {
     return () => clearInterval(interval)
   }, [])
 
-  // Fetch slot availability when clinic or date changes
   const fetchAvailability = useCallback(async (targetClinic, targetDate) => {
     if (!targetClinic || !targetDate) return
+
+    const dateObj = bookingDates.find(d => d.dateStr === targetDate)
+    if (dateObj?.isHoliday || dateObj?.isSunday) {
+      setAvailability({
+        clinic: targetClinic,
+        date: targetDate,
+        isClosed: true,
+        isHoliday: true,
+        isSunday: true,
+        slots: [],
+        totalSlots: 0,
+        availableCount: 0,
+        bookedCount: 0,
+        message: 'The clinic is closed on Sundays (Holiday). Please select an alternate date.'
+      })
+      setSlotsLoading(false)
+      setSlotsError('')
+      return
+    }
 
     setSlotsLoading(true)
     setSlotsError('')
@@ -199,7 +227,7 @@ export default function Queue() {
     } finally {
       setSlotsLoading(false)
     }
-  }, [])
+  }, [bookingDates])
 
   useEffect(() => {
     if (clinic && selectedDate) {
@@ -217,10 +245,8 @@ export default function Queue() {
     return paymentScreenshot !== null
   }
 
-  // Submit appointment booking
   async function bookAppointment() {
     if (loading) return
-
     if (!clinic || !consultationMode || !selectedDate || !selectedSlot || !form.name || !form.phone) {
       setError('Please complete all required fields before confirming.')
       return
@@ -243,228 +269,276 @@ export default function Queue() {
         paymentMethod: paymentMethod === 'online' ? 'ONLINE' : 'CASH'
       }
 
-      console.log('[BOOKING REQUEST] Submitting appointment:', requestBody)
-
       const result = await apiRequest('/appointments/book', {
         method: 'POST',
         body: JSON.stringify(requestBody)
       })
 
+      console.log('[BOOKING RESPONSE] Received:', result)
+
       if (result && result.success && result.data) {
-        setConfirmedBooking(result.data)
-        setStep(7) // Move to confirmation screen
+        setConfirmedAppointment(result.data)
+        setStep(7)
       } else {
-        throw new Error(result?.message || 'Failed to book appointment.')
+        setError(result?.message || 'Unable to confirm appointment. Please try again.')
       }
     } catch (err) {
       console.error('[BOOKING ERROR]', err)
-      const errorMsg = err.data?.message || err.message || 'Something went wrong while booking. Please try again.'
-      setError(errorMsg)
-
-      // If slot conflict (409), refresh availability and send user back to slot selection
-      if (err.status === 409 || err.data?.code === 'SLOT_ALREADY_BOOKED') {
+      const msg = err.data?.message || err.message || 'Booking failed. Please check slot availability and try again.'
+      setError(msg)
+      if (err.data?.code === 'SLOT_ALREADY_BOOKED') {
         setSelectedSlot(null)
         fetchAvailability(clinic, selectedDate)
-        setStep(5)
       }
     } finally {
       setLoading(false)
     }
   }
 
+  function handleClinicChange(newClinic) {
+    setClinic(newClinic)
+    setSelectedSlot(null)
+    setError('')
+  }
+
   const clinicObj = CLINICS.find(c => c.id === clinic)
 
-  const stepLabels = ['Clinic', 'Mode', 'Details', 'Date', 'Time Slot', 'Payment']
-
   return (
-    <>
-      <SEOMeta pageKey="queue" />
+    <div className="page-wrapper" style={{ background: '#F8FAFA', minHeight: '100vh' }}>
+      <SEOMeta
+        title="Book Appointment & Live Token Queue — Dr. Praveen Ramakrishnan"
+        description="Book your Endocrinology appointment with Dr. Praveen Ramakrishnan at DiaPlus or ThyroPlus clinics, or track your live queue token in real time."
+        path="/queue"
+      />
 
-      {/* Global In-Flight Modal Loader */}
-      {loading && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
-          background: 'rgba(10, 22, 40, 0.6)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '20px'
-        }}>
-          <div style={{
-            background: '#fff', borderRadius: '20px', padding: '36px 32px',
-            maxWidth: '380px', width: '100%', textAlign: 'center',
-            boxShadow: '0 20px 60px rgba(11, 123, 111, 0.25)',
-            border: '1px solid #E2EEEC'
-          }}>
-            <div style={{
-              width: '52px', height: '52px', margin: '0 auto 20px',
-              border: '4px solid #E2EEEC', borderTopColor: '#0B7B6F',
-              borderRadius: '50%', animation: 'bookingSpin 0.8s linear infinite'
-            }} />
-            <h3 style={{
-              fontFamily: "'Cormorant Garamond',serif", fontSize: '24px',
-              fontWeight: '700', color: '#0A1628', marginBottom: '10px'
-            }}>
-              Confirming Appointment
-            </h3>
-            <p style={{ color: '#64748B', fontSize: '14px', lineHeight: '1.6', margin: 0 }}>
-              Securing your 15-minute slot. Please do not refresh or leave this page.
-            </p>
-          </div>
-        </div>
-      )}
-
-      <div style={{ paddingTop: '72px', minHeight: '100vh', background: '#F8FAFA' }}>
-
-        {/* Header */}
-        <div style={{ background: 'linear-gradient(135deg,#0A1628,#0F2040)', padding: '60px 5%', textAlign: 'center' }}>
-          <div className="section-tag" style={{ justifyContent: 'center', color: '#0FA898' }}>APPOINTMENT SYSTEM</div>
-          <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 'clamp(32px,4vw,52px)', fontWeight: '700', color: '#fff' }}>
-            Book Your <em style={{ fontStyle: 'italic', color: '#0FA898' }}>Doctor Appointment</em>
+      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '120px 24px 80px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          <span className="section-label" style={{ display: 'inline-block', marginBottom: '8px' }}>
+            Appointments & Token Tracker
+          </span>
+          <h1 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '42px', fontWeight: '700', color: '#0A1628', marginBottom: '12px' }}>
+            Book Consultation
           </h1>
-          <p style={{ color: 'rgba(255,255,255,0.7)', marginTop: '12px', fontSize: '15px' }}>
-            Choose your clinic, consultation mode, and 15-minute time slot with Dr. Praveen.
+          <p style={{ color: '#64748B', fontSize: '16px', maxWidth: '520px', margin: '0 auto' }}>
+            Schedule an in-person or online video consultation with Dr. Praveen Ramakrishnan
           </p>
         </div>
 
-        {/* Progress Bar (Steps 1 to 6) */}
-        {step < 7 && (
-          <div className="queue-progress" style={{ background: '#fff', borderBottom: '1px solid #E2EEEC', padding: '14px 5%', display: 'flex', justifyContent: 'center', gap: '8px', alignItems: 'center' }}>
-            {stepLabels.map((s, i) => (
-              <div key={s} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <div className="queue-step-circle" style={{
-                  width: '26px', height: '26px', borderRadius: '50%',
-                  background: step > i + 1 ? '#0B7B6F' : step === i + 1 ? '#0B7B6F' : '#E2EEEC',
-                  color: step >= i + 1 ? '#fff' : '#64748B',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '11px', fontWeight: '700'
-                }}>
-                  {step > i + 1 ? '✓' : i + 1}
-                </div>
-                <span className="queue-step-label" style={{
-                  fontSize: '12px',
-                  fontWeight: step === i + 1 ? '700' : '500',
-                  color: step === i + 1 ? '#0A1628' : '#64748B'
-                }}>
-                  {s}
-                </span>
-                {i < stepLabels.length - 1 && <span style={{ color: '#CBD5E1', fontSize: '14px' }}>›</span>}
-              </div>
-            ))}
-          </div>
-        )}
+        <div style={{ display: 'flex', background: '#E2EEEC', borderRadius: '14px', padding: '4px', marginBottom: '36px', maxWidth: '420px', margin: '0 auto 36px' }}>
+          <button
+            onClick={() => setActiveTab('book')}
+            style={{
+              flex: 1, padding: '10px 16px', borderRadius: '11px', border: 'none',
+              background: activeTab === 'book' ? '#0B7B6F' : 'transparent',
+              color: activeTab === 'book' ? '#fff' : '#64748B',
+              fontWeight: '700', fontSize: '13px', cursor: 'pointer',
+              transition: 'all 0.2s', fontFamily: "'DM Sans',sans-serif"
+            }}
+          >
+            📅 Book Appointment
+          </button>
+          <button
+            onClick={() => setActiveTab('track')}
+            style={{
+              flex: 1, padding: '10px 16px', borderRadius: '11px', border: 'none',
+              background: activeTab === 'track' ? '#0B7B6F' : 'transparent',
+              color: activeTab === 'track' ? '#fff' : '#64748B',
+              fontWeight: '700', fontSize: '13px', cursor: 'pointer',
+              transition: 'all 0.2s', fontFamily: "'DM Sans',sans-serif"
+            }}
+          >
+            🎫 Live Token Tracker
+          </button>
+        </div>
 
-        <div className="queue-container" style={{ maxWidth: '580px', margin: '40px auto', padding: '0 5%' }}>
+        {activeTab === 'book' && (
           <div style={{ background: '#fff', borderRadius: '20px', padding: '36px', boxShadow: '0 4px 24px rgba(11,123,111,0.08)', border: '1px solid #E2EEEC' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px', position: 'relative' }}>
+              <div style={{ position: 'absolute', top: '16px', left: '20px', right: '20px', height: '2px', background: '#E2EEEC', zIndex: 0 }} />
+              <div style={{ position: 'absolute', top: '16px', left: '20px', width: `${((step - 1) / 6) * 100}%`, height: '2px', background: '#0B7B6F', zIndex: 0, transition: 'width 0.3s' }} />
 
-            {/* Step 1 — Choose Clinic */}
+              {['Clinic', 'Mode', 'Details', 'Date', 'Time Slot', 'Payment', 'Confirmed'].map((sName, idx) => {
+                const sNum = idx + 1
+                const isPassed = step > sNum
+                const isCurrent = step === sNum
+
+                return (
+                  <div key={sName} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+                    <div style={{
+                      width: '32px', height: '32px', borderRadius: '50%',
+                      background: isPassed ? '#0B7B6F' : isCurrent ? '#0B7B6F' : '#fff',
+                      border: `2px solid ${isPassed || isCurrent ? '#0B7B6F' : '#CBD5E1'}`,
+                      color: isPassed || isCurrent ? '#fff' : '#94A3B8',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '12px', fontWeight: '700',
+                      transition: 'all 0.2s'
+                    }}>
+                      {isPassed ? '✓' : sNum}
+                    </div>
+                    <span style={{ fontSize: '10px', fontWeight: isCurrent ? '700' : '500', color: isCurrent ? '#0B7B6F' : '#94A3B8', marginTop: '6px', textAlign: 'center' }}>
+                      {sName}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+
             {step === 1 && (
               <div>
-                <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>Select Clinic</h2>
-                <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '24px' }}>Where would you like to consult Dr. Praveen?</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  {CLINICS.map(c => (
-                    <div
-                      key={c.id}
-                      onClick={() => {
-                        setClinic(c.id)
-                        setSelectedSlot(null) // reset selected slot if clinic changed
-                        setStep(2)
-                      }}
-                      style={{
-                        border: `2px solid ${clinic === c.id ? '#0B7B6F' : '#E2EEEC'}`,
-                        borderRadius: '14px',
-                        padding: '20px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        background: clinic === c.id ? '#E6F4F2' : '#fff'
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.borderColor = '#0B7B6F'}
-                      onMouseLeave={e => e.currentTarget.style.borderColor = clinic === c.id ? '#0B7B6F' : '#E2EEEC'}
-                    >
-                      <div style={{ fontWeight: '700', color: '#0A1628', fontSize: '16px', marginBottom: '4px' }}>{c.name}</div>
-                      <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '6px' }}>{c.address}</div>
-                      <div style={{ fontSize: '12px', color: '#0B7B6F', fontWeight: '600' }}>
-                        🕒 {c.id === 'diaplus' ? '1:00 PM – 4:30 PM · 8:30 PM – 10:30 PM' : '6:30 PM – 8:00 PM'}
+                <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>Select Clinic Location</h2>
+                <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '24px' }}>Choose which clinic location you would like to visit</p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+                  {CLINICS.map(c => {
+                    const isSelected = clinic === c.id
+                    return (
+                      <div
+                        key={c.id}
+                        onClick={() => handleClinicChange(c.id)}
+                        style={{
+                          border: `2px solid ${isSelected ? '#0B7B6F' : '#E2EEEC'}`,
+                          borderRadius: '16px',
+                          padding: '24px 20px',
+                          cursor: 'pointer',
+                          background: isSelected ? '#E6F4F2' : '#fff',
+                          transition: 'all 0.2s',
+                          position: 'relative'
+                        }}
+                      >
+                        {isSelected && (
+                          <span style={{ position: 'absolute', top: '12px', right: '12px', background: '#0B7B6F', color: '#fff', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700' }}>
+                            ✓
+                          </span>
+                        )}
+                        <div style={{ fontSize: '24px', marginBottom: '10px' }}>{c.id === 'diaplus' ? '🏥' : '🩺'}</div>
+                        <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '20px', fontWeight: '700', color: '#0A1628', marginBottom: '4px' }}>{c.name}</h3>
+                        <p style={{ color: '#64748B', fontSize: '13px', marginBottom: '12px' }}>{c.timing}</p>
+                        <div style={{ display: 'inline-block', background: isSelected ? '#0B7B6F' : '#F1F5F9', color: isSelected ? '#fff' : '#64748B', fontSize: '11px', fontWeight: '600', padding: '3px 8px', borderRadius: '6px' }}>
+                          {c.id === 'diaplus' ? 'Afternoon & Evening Slots' : 'Evening Slots'}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
+                </div>
+
+                {error && <p style={{ color: '#ef4444', fontSize: '13px', marginBottom: '16px' }}>⚠️ {error}</p>}
+
+                <div className="action-row" style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    onClick={() => {
+                      if (!clinic) {
+                        setError('Please select a clinic location.')
+                        return
+                      }
+                      setError('')
+                      setStep(2)
+                    }}
+                    className="btn-primary"
+                    style={{ width: '100%' }}
+                  >
+                    Continue to Consultation Mode →
+                  </button>
                 </div>
               </div>
             )}
 
-            {/* Step 2 — Consultation Mode */}
             {step === 2 && (
               <div>
                 <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>Consultation Mode</h2>
-                <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '24px' }}>Select how you prefer to attend your appointment</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  <div
-                    onClick={() => { setConsultationMode('IN_PERSON'); setStep(3); }}
-                    style={{
-                      border: `2px solid ${consultationMode === 'IN_PERSON' ? '#0B7B6F' : '#E2EEEC'}`,
-                      borderRadius: '14px',
-                      padding: '20px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      background: consultationMode === 'IN_PERSON' ? '#E6F4F2' : '#fff'
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.borderColor = '#0B7B6F'}
-                    onMouseLeave={e => e.currentTarget.style.borderColor = consultationMode === 'IN_PERSON' ? '#0B7B6F' : '#E2EEEC'}
-                  >
-                    <div style={{ fontWeight: '700', color: '#0A1628', fontSize: '16px', marginBottom: '4px' }}>🏥 In-Person Consultation</div>
-                    <div style={{ fontSize: '12px', color: '#64748B' }}>Visit {clinicObj?.name || 'the clinic'} for direct doctor consultation</div>
-                  </div>
+                <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '24px' }}>Choose how you would like to consult with Dr. Praveen</p>
 
-                  <div
-                    onClick={() => { setConsultationMode('ONLINE'); setStep(3); }}
-                    style={{
-                      border: `2px solid ${consultationMode === 'ONLINE' ? '#0B7B6F' : '#E2EEEC'}`,
-                      borderRadius: '14px',
-                      padding: '20px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      background: consultationMode === 'ONLINE' ? '#E6F4F2' : '#fff'
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.borderColor = '#0B7B6F'}
-                    onMouseLeave={e => e.currentTarget.style.borderColor = consultationMode === 'ONLINE' ? '#0B7B6F' : '#E2EEEC'}
-                  >
-                    <div style={{ fontWeight: '700', color: '#0A1628', fontSize: '16px', marginBottom: '4px' }}>💻 Online Video / Phone Consultation</div>
-                    <div style={{ fontSize: '12px', color: '#64748B' }}>Consult remotely from the comfort of your home</div>
-                  </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+                  {[
+                    { id: 'IN_PERSON', title: 'In-Person Consultation', icon: '🏥', desc: `Visit ${clinicObj?.name || 'the clinic'} in person at your scheduled time slot.` },
+                    { id: 'ONLINE', title: 'Online Video Consultation', icon: '💻', desc: 'Consult Dr. Praveen securely via a high-definition video call from home.' },
+                  ].map(m => {
+                    const isSelected = consultationMode === m.id
+                    return (
+                      <div
+                        key={m.id}
+                        onClick={() => setConsultationMode(m.id)}
+                        style={{
+                          border: `2px solid ${isSelected ? '#0B7B6F' : '#E2EEEC'}`,
+                          borderRadius: '16px',
+                          padding: '24px 20px',
+                          cursor: 'pointer',
+                          background: isSelected ? '#E6F4F2' : '#fff',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <div style={{ fontSize: '28px', marginBottom: '10px' }}>{m.icon}</div>
+                        <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '20px', fontWeight: '700', color: '#0A1628', marginBottom: '6px' }}>{m.title}</h3>
+                        <p style={{ color: '#64748B', fontSize: '13px', lineHeight: '1.5' }}>{m.desc}</p>
+                      </div>
+                    )
+                  })}
                 </div>
-                <div style={{ marginTop: '20px' }}>
-                  <button onClick={() => setStep(1)} className="btn-secondary" style={{ width: '100%' }}>← Back to Clinic</button>
+
+                <div className="action-row" style={{ display: 'flex', gap: '10px' }}>
+                  <button onClick={() => setStep(1)} className="btn-secondary" style={{ flex: 1 }}>← Back</button>
+                  <button onClick={() => setStep(3)} className="btn-primary" style={{ flex: 2 }}>Enter Patient Details →</button>
                 </div>
               </div>
             )}
 
-            {/* Step 3 — Patient Details */}
             {step === 3 && (
               <div>
                 <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>Patient Details</h2>
-                <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '24px' }}>
-                  Clinic: <strong style={{ color: '#0B7B6F' }}>{clinicObj?.name}</strong> · Mode: <strong style={{ color: '#0B7B6F' }}>{consultationMode === 'ONLINE' ? 'Online' : 'In-Person'}</strong>
-                </p>
+                <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '24px' }}>Please provide the patient's contact and consultation information</p>
 
-                {[
-                  { label: 'Full Name *', key: 'name', type: 'text', placeholder: 'Enter your full name' },
-                  { label: 'Phone Number *', key: 'phone', type: 'tel', placeholder: '10-digit mobile number' },
-                  { label: 'Email Address', key: 'email', type: 'email', placeholder: 'Enter your email address' },
-                  { label: 'Place / City', key: 'place', type: 'text', placeholder: 'Enter your city or town' },
-                ].map(f => (
-                  <div key={f.key} style={{ marginBottom: '18px' }}>
-                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#0B7B6F', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>{f.label}</label>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#0B7B6F', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>Patient Full Name *</label>
+                  <input
+                    type="text"
+                    placeholder="Enter full name"
+                    value={form.name}
+                    onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                    style={{ width: '100%', padding: '12px 14px', border: '1.5px solid #E2EEEC', borderRadius: '10px', fontSize: '14px', fontFamily: "'DM Sans',sans-serif", outline: 'none' }}
+                    onFocus={e => e.target.style.borderColor = '#0B7B6F'}
+                    onBlur={e => e.target.style.borderColor = '#E2EEEC'}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#0B7B6F', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>Phone Number (10 digits) *</label>
+                  <input
+                    type="tel"
+                    placeholder="10-digit mobile number"
+                    maxLength={10}
+                    value={form.phone}
+                    onChange={e => setForm(p => ({ ...p, phone: e.target.value.replace(/\D/g, '') }))}
+                    style={{ width: '100%', padding: '12px 14px', border: '1.5px solid #E2EEEC', borderRadius: '10px', fontSize: '14px', fontFamily: "'DM Sans',sans-serif", outline: 'none' }}
+                    onFocus={e => e.target.style.borderColor = '#0B7B6F'}
+                    onBlur={e => e.target.style.borderColor = '#E2EEEC'}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#0B7B6F', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>Email Address (Optional)</label>
                     <input
-                      type={f.type}
-                      placeholder={f.placeholder}
-                      value={form[f.key]}
-                      maxLength={f.key === 'phone' ? 10 : undefined}
-                      onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
+                      type="email"
+                      placeholder="patient@example.com"
+                      value={form.email}
+                      onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
                       style={{ width: '100%', padding: '12px 14px', border: '1.5px solid #E2EEEC', borderRadius: '10px', fontSize: '14px', fontFamily: "'DM Sans',sans-serif", outline: 'none' }}
                       onFocus={e => e.target.style.borderColor = '#0B7B6F'}
                       onBlur={e => e.target.style.borderColor = '#E2EEEC'}
                     />
                   </div>
-                ))}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#0B7B6F', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>Place / City (Optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Bangalore"
+                      value={form.place}
+                      onChange={e => setForm(p => ({ ...p, place: e.target.value }))}
+                      style={{ width: '100%', padding: '12px 14px', border: '1.5px solid #E2EEEC', borderRadius: '10px', fontSize: '14px', fontFamily: "'DM Sans',sans-serif", outline: 'none' }}
+                      onFocus={e => e.target.style.borderColor = '#0B7B6F'}
+                      onBlur={e => e.target.style.borderColor = '#E2EEEC'}
+                    />
+                  </div>
+                </div>
 
                 <div style={{ marginBottom: '24px' }}>
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#0B7B6F', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>Reason for Visit *</label>
@@ -472,22 +546,18 @@ export default function Queue() {
                     value={form.reason}
                     onChange={e => setForm(p => ({ ...p, reason: e.target.value }))}
                     style={{ width: '100%', padding: '12px 14px', border: '1.5px solid #E2EEEC', borderRadius: '10px', fontSize: '14px', fontFamily: "'DM Sans',sans-serif", outline: 'none', background: '#fff' }}
-                    onFocus={e => e.target.style.borderColor = '#0B7B6F'}
-                    onBlur={e => e.target.style.borderColor = '#E2EEEC'}
                   >
                     <option value="">Select reason...</option>
                     {REASONS.map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </div>
 
-                {error && <p style={{ color: '#ef4444', fontSize: '13px', marginBottom: '16px' }}>⚠️ {error}</p>}
-
                 <div className="action-row" style={{ display: 'flex', gap: '10px' }}>
                   <button onClick={() => setStep(2)} className="btn-secondary" style={{ flex: 1 }}>← Back</button>
                   <button
                     onClick={() => {
                       if (!form.name.trim() || !form.phone.trim() || !form.reason) {
-                        setError('Please fill in your name, phone number, and reason for visit.')
+                        setError('Please fill in required fields.')
                         return
                       }
                       if (form.phone.replace(/\D/g, '').length < 10) {
@@ -495,9 +565,13 @@ export default function Queue() {
                         return
                       }
                       setError('')
-                      // Auto-select today if no date selected yet
                       if (!selectedDate && bookingDates.length > 0) {
-                        setSelectedDate(bookingDates[0].dateStr)
+                        const firstOpen = bookingDates.find(d => !d.isHoliday)
+                        if (firstOpen) {
+                          setSelectedDate(firstOpen.dateStr)
+                        } else {
+                          setSelectedDate(bookingDates[0].dateStr)
+                        }
                       }
                       setStep(4)
                     }}
@@ -510,41 +584,52 @@ export default function Queue() {
               </div>
             )}
 
-            {/* Step 4 — Select Date */}
             {step === 4 && (
               <div>
                 <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628', marginBottom: '8px' }}>Select Date</h2>
-                <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '20px' }}>Choose from the next 7 calendar days</p>
+                <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '20px' }}>Choose from the next 7 calendar days (Sundays are clinic holidays)</p>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '10px', marginBottom: '24px' }}>
                   {bookingDates.map(d => {
                     const isSelected = selectedDate === d.dateStr
+                    const isClosed = d.isHoliday || d.isSunday
                     return (
                       <button
                         key={d.dateStr}
                         type="button"
+                        disabled={isClosed}
                         onClick={() => {
-                          setSelectedDate(d.dateStr)
-                          setSelectedSlot(null) // reset slot on date switch
+                          if (!isClosed) {
+                            setSelectedDate(d.dateStr)
+                            setSelectedSlot(null)
+                            setError('')
+                          }
                         }}
+                        title={isClosed ? 'Clinic is closed on Sundays (Holiday)' : `Select ${d.dayLabel}, ${d.dateLabel}`}
                         style={{
                           padding: '14px 10px',
                           borderRadius: '12px',
-                          border: `2px solid ${isSelected ? '#0B7B6F' : '#E2EEEC'}`,
-                          background: isSelected ? '#E6F4F2' : '#fff',
-                          cursor: 'pointer',
+                          border: isClosed ? '1.5px dashed #CBD5E1' : `2px solid ${isSelected ? '#0B7B6F' : '#E2EEEC'}`,
+                          background: isClosed ? '#F8FAFC' : (isSelected ? '#E6F4F2' : '#fff'),
+                          cursor: isClosed ? 'not-allowed' : 'pointer',
                           textAlign: 'center',
-                          transition: 'all 0.15s'
+                          transition: 'all 0.15s',
+                          opacity: isClosed ? 0.65 : 1
                         }}
-                        onMouseEnter={e => { if (!isSelected) e.currentTarget.style.borderColor = '#0B7B6F' }}
-                        onMouseLeave={e => { if (!isSelected) e.currentTarget.style.borderColor = '#E2EEEC' }}
+                        onMouseEnter={e => { if (!isSelected && !isClosed) e.currentTarget.style.borderColor = '#0B7B6F' }}
+                        onMouseLeave={e => { if (!isSelected && !isClosed) e.currentTarget.style.borderColor = isClosed ? '#CBD5E1' : '#E2EEEC' }}
                       >
-                        <div style={{ fontSize: '11px', fontWeight: '700', color: isSelected ? '#0B7B6F' : '#64748B', textTransform: 'uppercase', marginBottom: '4px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: isClosed ? '#94A3B8' : (isSelected ? '#0B7B6F' : '#64748B'), textTransform: 'uppercase', marginBottom: '4px' }}>
                           {d.dayLabel}
                         </div>
-                        <div style={{ fontSize: '15px', fontWeight: '800', color: isSelected ? '#0B7B6F' : '#0A1628' }}>
+                        <div style={{ fontSize: '15px', fontWeight: '800', color: isClosed ? '#94A3B8' : (isSelected ? '#0B7B6F' : '#0A1628') }}>
                           {d.dateLabel}
                         </div>
+                        {isClosed && (
+                          <div style={{ fontSize: '10px', fontWeight: '700', color: '#DC2626', marginTop: '4px', background: '#FEE2E2', padding: '2px 4px', borderRadius: '4px' }}>
+                            Holiday / Closed
+                          </div>
+                        )}
                       </button>
                     )
                   })}
@@ -560,6 +645,11 @@ export default function Queue() {
                         setError('Please select an appointment date.')
                         return
                       }
+                      const dateObj = bookingDates.find(d => d.dateStr === selectedDate)
+                      if (dateObj?.isHoliday || dateObj?.isSunday) {
+                        setError('The clinic is closed on Sundays (Holiday). Please select an open date.')
+                        return
+                      }
                       setError('')
                       setStep(5)
                     }}
@@ -572,18 +662,19 @@ export default function Queue() {
               </div>
             )}
 
-            {/* Step 5 — Select Time Slot */}
             {step === 5 && (
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '8px' }}>
                   <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628', margin: 0 }}>Select Time Slot</h2>
-                  <button
-                    type="button"
-                    onClick={() => fetchAvailability(clinic, selectedDate)}
-                    style={{ background: 'none', border: 'none', color: '#0B7B6F', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
-                  >
-                    🔄 Refresh Slots
-                  </button>
+                  {!availability?.isClosed && (
+                    <button
+                      type="button"
+                      onClick={() => fetchAvailability(clinic, selectedDate)}
+                      style={{ background: 'none', border: 'none', color: '#0B7B6F', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                    >
+                      🔄 Refresh Slots
+                    </button>
+                  )}
                 </div>
                 <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '18px' }}>
                   {clinicObj?.name} · <strong>{bookingDates.find(d => d.dateStr === selectedDate)?.dateLabel || selectedDate}</strong> (15-min slots)
@@ -598,30 +689,22 @@ export default function Queue() {
                     }} />
                     <div style={{ fontSize: '13px' }}>Loading live slot availability...</div>
                   </div>
+                ) : availability?.isClosed ? (
+                  <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '12px', padding: '24px', textAlign: 'center', marginBottom: '20px' }}>
+                    <div style={{ fontSize: '28px', marginBottom: '8px' }}>🌴</div>
+                    <div style={{ fontWeight: '700', color: '#92400E', fontSize: '16px', marginBottom: '4px' }}>Clinic Closed on Sundays</div>
+                    <div style={{ color: '#B45309', fontSize: '13px', marginBottom: '16px' }}>{availability.message || 'No appointment slots are available on Sundays (Holiday).'}</div>
+                    <button onClick={() => setStep(4)} className="btn-secondary" style={{ padding: '8px 16px', fontSize: '13px' }}>← Choose Another Date</button>
+                  </div>
                 ) : slotsError ? (
                   <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', padding: '16px', color: '#B91C1C', fontSize: '13px', marginBottom: '20px' }}>
                     {slotsError}
                   </div>
                 ) : availability && availability.slots ? (
                   <div>
-                    {/* Slot Availability Legend */}
-                    <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', fontSize: '12px', color: '#64748B' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ width: '12px', height: '12px', borderRadius: '3px', border: '1.5px solid #0B7B6F', background: '#fff' }} /> Available
-                      </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#0B7B6F' }} /> Selected
-                      </span>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#F1F5F9', border: '1px solid #CBD5E1' }} /> Booked / Past
-                      </span>
-                    </div>
-
-                    {/* Slots Grid grouped by Period */}
                     {['Afternoon', 'Evening'].map(period => {
                       const periodSlots = availability.slots.filter(s => s.period === period || (!s.period && period === 'Evening'))
                       if (periodSlots.length === 0) return null
-
                       return (
                         <div key={period} style={{ marginBottom: '20px' }}>
                           <div style={{ fontSize: '12px', fontWeight: '700', color: '#0B7B6F', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>
@@ -631,7 +714,6 @@ export default function Queue() {
                             {periodSlots.map(slot => {
                               const isSelected = selectedSlot?.time24 === slot.time24
                               const isAvailable = slot.available
-
                               return (
                                 <button
                                   key={slot.time24}
@@ -925,9 +1007,10 @@ export default function Queue() {
             )}
 
           </div>
+        )}
 
-          {/* Live Queue widget underneath */}
-          <LiveQueue data={queueData} />
+        {/* Live Queue widget underneath */}
+        <LiveQueue data={queueData} />
         </div>
 
         <style>{`
@@ -957,6 +1040,6 @@ export default function Queue() {
           }
         `}</style>
       </div>
-    </>
+    </div>
   )
 }

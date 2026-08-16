@@ -876,6 +876,19 @@ export default function AdminDashboard() {
                           <div style={{ padding: '24px', textAlign: 'center', color: '#94A3B8', fontSize: '12px', background: '#F8FAFA', borderRadius: '9px' }}>
                             ⏳ Loading today's slot availability...
                           </div>
+                        ) : todaySlotsData?.isClosed ? (
+                          <div style={{
+                            background: '#FFFBEB', border: '1.5px solid #FDE68A', borderRadius: '10px',
+                            padding: '18px 16px', textAlign: 'center'
+                          }}>
+                            <div style={{ fontSize: '24px', marginBottom: '6px' }}>🌴</div>
+                            <div style={{ fontWeight: '800', color: '#92400E', fontSize: '13px', marginBottom: '3px' }}>
+                              Sunday Holiday — Clinic Closed
+                            </div>
+                            <div style={{ color: '#B45309', fontSize: '11px', lineHeight: '1.4' }}>
+                              {todaySlotsData.message || 'The clinic is closed on Sundays. Same-day appointments cannot be scheduled today.'}
+                            </div>
+                          </div>
                         ) : todaySlotsData ? (
                           <div>
                             {/* Stats Badge */}
