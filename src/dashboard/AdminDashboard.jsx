@@ -498,10 +498,55 @@ export default function AdminDashboard() {
     display: 'block', marginBottom: '8px',
   }
 
-  // Appointment counts for quick badges
-  const scheduledCount = appointments.filter(a => a.status === 'CONFIRMED' || a.status === 'PENDING').length
+  // Calculate today's date & current time in IST (Asia/Kolkata)
+  function isAppointmentExpired(appointmentDate, appointmentTime) {
+    if (!appointmentDate) return true
+    const now = new Date()
+    const todayIST = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(now)
+
+    const currentTimeIST = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).format(now)
+
+    if (appointmentDate < todayIST) return true
+    if (appointmentDate === todayIST) {
+      if (!appointmentTime) return false
+      return appointmentTime < currentTimeIST
+    }
+    return false
+  }
+
+  // Active / displayed appointments calculation
+  const isDateFiltered = Boolean(apptFilterDate)
+
+  const displayedAppointments = appointments.filter(a => {
+    // If the user explicitly selects a date filter, show all appointments matching that date
+    if (isDateFiltered) return true
+    // If user explicitly filters for COMPLETED or CANCELLED status, show them
+    if (apptFilterStatus === 'COMPLETED' || apptFilterStatus === 'CANCELLED') return true
+    // In default active/upcoming view, exclude expired appointments
+    return !isAppointmentExpired(a.appointmentDate, a.appointmentTime)
+  })
+
+  // Scheduled count represents currently active upcoming appointments (or scheduled on selected date)
+  const scheduledCount = appointments.filter(a => {
+    const isScheduledStatus = a.status === 'CONFIRMED' || a.status === 'PENDING'
+    if (!isScheduledStatus) return false
+    if (isDateFiltered) return true
+    return !isAppointmentExpired(a.appointmentDate, a.appointmentTime)
+  }).length
+
   const completedCount = appointments.filter(a => a.status === 'COMPLETED').length
   const cancelledCount = appointments.filter(a => a.status === 'CANCELLED').length
+  const totalBookingsCount = isDateFiltered ? appointments.length : displayedAppointments.length
 
   return (
     <>
@@ -1292,7 +1337,7 @@ export default function AdminDashboard() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '20px' }}>
                 <div style={{ background: '#fff', borderRadius: '12px', padding: '16px', border: '1px solid #E2EEEC', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                   <div style={{ fontSize: '10px', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: '4px' }}>Total Bookings</div>
-                  <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628' }}>{appointments.length}</div>
+                  <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '28px', fontWeight: '700', color: '#0A1628' }}>{totalBookingsCount}</div>
                 </div>
                 <div style={{ background: '#fff', borderRadius: '12px', padding: '16px', border: '1px solid #E2EEEC', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                   <div style={{ fontSize: '10px', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.7px', marginBottom: '4px' }}>Scheduled</div>
@@ -1394,14 +1439,14 @@ export default function AdminDashboard() {
               <div style={{ background: '#fff', borderRadius: '14px', border: '1px solid #E2EEEC', overflow: 'hidden' }}>
                 <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2EEEC', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFA' }}>
                   <div style={{ fontWeight: '700', color: '#0A1628', fontSize: '14px' }}>Appointments Schedule</div>
-                  <div style={{ fontSize: '12px', color: '#64748B' }}>Showing {appointments.length} appointments</div>
+                  <div style={{ fontSize: '12px', color: '#64748B' }}>Showing {displayedAppointments.length} appointments</div>
                 </div>
 
                 {apptLoading ? (
                   <div style={{ padding: '48px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>
                     <div>🔄 Loading appointments...</div>
                   </div>
-                ) : appointments.length === 0 ? (
+                ) : displayedAppointments.length === 0 ? (
                   <div style={{ padding: '48px', textAlign: 'center', color: '#94A3B8', fontSize: '14px' }}>
                     <div>No appointments found for the selected criteria.</div>
                   </div>
@@ -1420,7 +1465,7 @@ export default function AdminDashboard() {
                         </tr>
                       </thead>
                       <tbody>
-                        {appointments.map((appt) => {
+                        {displayedAppointments.map((appt) => {
                           const isCancelled = appt.status === 'CANCELLED'
                           const isCompleted = appt.status === 'COMPLETED'
                           const isScheduled = appt.status === 'CONFIRMED' || appt.status === 'PENDING'

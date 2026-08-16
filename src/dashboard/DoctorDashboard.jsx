@@ -151,7 +151,32 @@ export default function DoctorDashboard() {
   const completed = apiPatients.filter(p => p.status === 'COMPLETED')
   const revenue   = completed.length * 750
 
-  // Calculate today's date in IST YYYY-MM-DD
+  // Calculate today's date & time in IST YYYY-MM-DD
+  function isAppointmentExpired(appointmentDate, appointmentTime) {
+    if (!appointmentDate) return true
+    const now = new Date()
+    const todayIST = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(now)
+
+    const currentTimeIST = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).format(now)
+
+    if (appointmentDate < todayIST) return true
+    if (appointmentDate === todayIST) {
+      if (!appointmentTime) return false
+      return appointmentTime < currentTimeIST
+    }
+    return false
+  }
+
   const todayIST = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Kolkata',
     year: 'numeric',
@@ -160,8 +185,8 @@ export default function DoctorDashboard() {
   }).format(new Date())
 
   // Filter appointments for Doctor view
-  const todayAppointments = appointments.filter(a => a.appointmentDate === todayIST && a.status !== 'CANCELLED')
-  const upcomingAppointments = appointments.filter(a => a.appointmentDate > todayIST && a.status !== 'CANCELLED')
+  const todayAppointments = appointments.filter(a => a.appointmentDate === todayIST && a.status !== 'CANCELLED' && !isAppointmentExpired(a.appointmentDate, a.appointmentTime))
+  const upcomingAppointments = appointments.filter(a => a.status !== 'CANCELLED' && !isAppointmentExpired(a.appointmentDate, a.appointmentTime))
   
   const displayedAppointments = apptFilterTab === 'today'
     ? todayAppointments
