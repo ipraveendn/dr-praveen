@@ -135,7 +135,7 @@ export default function Clinics() {
                       border: '1.5px solid rgba(255,255,255,0.3)',
                       textDecoration: 'none'
                     }}>
-                      Book Token
+                      Book Appointment
                     </Link>
 
                     <a href={c.maps} target="_blank" rel="noreferrer" style={{

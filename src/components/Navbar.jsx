@@ -8,7 +8,7 @@ const links = [
   { to: '/clinics', label: 'Clinics' },
   { to: '/pharmacy', label: 'Pharmacy' },
   { to: '/laboratory', label: 'Lab' },
-  { to: '/queue', label: 'Book Token' },
+  { to: '/queue', label: 'Book Appointment' },
   { to: '/contact', label: 'Contact' },
 ]
 

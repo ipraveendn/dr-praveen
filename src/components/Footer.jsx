@@ -116,7 +116,7 @@ export default function Footer() {
               Quick Links
             </div>
 
-            {[['/', 'Home'], ['/about', 'About Doctor'], ['/services', 'Our Services'], ['/clinics', 'Clinic Locations'], ['/queue', 'Book Token'], ['/blog', 'Health Tips'], ['/contact', 'Contact']]
+            {[['/', 'Home'], ['/about', 'About Doctor'], ['/services', 'Our Services'], ['/clinics', 'Clinic Locations'], ['/queue', 'Book Appointment'], ['/blog', 'Health Tips'], ['/contact', 'Contact']]
               .map(([to, label]) => (
                 <Link key={to} to={to} style={T}
                   onMouseEnter={e => e.currentTarget.style.color = '#0FA898'}

@@ -157,7 +157,7 @@ export default function Hero() {
             {/* CTA */}
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
               <Link to="/services" className="btn-primary">View Services</Link>
-              <Link to="/queue" className="btn-secondary">Get Queue Token</Link>
+              <Link to="/queue" className="btn-secondary">Book Appointment</Link>
             </div>
 
           </div>

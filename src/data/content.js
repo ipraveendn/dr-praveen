@@ -258,7 +258,7 @@ export const WHATSAPP_MSG = `Hi Dr. Praveen! I would like to book an appointment
 export const CHATBOT_RESPONSES = {
   greeting: "Hello! I'm the DiaPlus Assistant. How can I help?",
   
-  book: "📅 Booking Appointment:\n\n• Visit 'Book Token' page on our website\n• Select your preferred clinic (DiaPlus or ThyroPlus)\n• Choose your preferred time slot\n• Confirm booking - you'll get instant confirmation\n\n💬 Or WhatsApp: 8073116280 (DiaPlus) / 9686039505 (ThyroPlus)",
+  book: "📅 Booking Appointment:\n\n• Visit 'Book Appointment' page on our website\n• Select your preferred clinic (DiaPlus or ThyroPlus)\n• Choose your preferred time slot\n• Confirm booking - you'll get instant confirmation\n\n💬 Or WhatsApp: 8073116280 (DiaPlus) / 9686039505 (ThyroPlus)",
   
   timings: "🕐 Clinic Timings:\n\n📍 DiaPlus Clinic (Yelahanka):\n• 9:00 AM - 10:00 AM\n• 12:00 PM - 4:00 PM\n• 8:00 PM - 10:00 PM\n• Mon - Sat\n\n📍 ThyroPlus Clinic (Sahakaranagar):\n• 6:00 PM - 8:00 PM\n• Mon - Sat (Evening Clinic)",
   
