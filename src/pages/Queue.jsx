@@ -1011,7 +1011,6 @@ export default function Queue() {
 
         {/* Live Queue widget underneath */}
         <LiveQueue data={queueData} />
-        </div>
 
         <style>{`
           @keyframes bookingSpin {
