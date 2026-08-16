@@ -324,36 +324,8 @@ export default function Queue() {
           </p>
         </div>
 
-        <div style={{ display: 'flex', background: '#E2EEEC', borderRadius: '14px', padding: '4px', marginBottom: '36px', maxWidth: '420px', margin: '0 auto 36px' }}>
-          <button
-            onClick={() => setActiveTab('book')}
-            style={{
-              flex: 1, padding: '10px 16px', borderRadius: '11px', border: 'none',
-              background: activeTab === 'book' ? '#0B7B6F' : 'transparent',
-              color: activeTab === 'book' ? '#fff' : '#64748B',
-              fontWeight: '700', fontSize: '13px', cursor: 'pointer',
-              transition: 'all 0.2s', fontFamily: "'DM Sans',sans-serif"
-            }}
-          >
-            📅 Book Appointment
-          </button>
-          <button
-            onClick={() => setActiveTab('track')}
-            style={{
-              flex: 1, padding: '10px 16px', borderRadius: '11px', border: 'none',
-              background: activeTab === 'track' ? '#0B7B6F' : 'transparent',
-              color: activeTab === 'track' ? '#fff' : '#64748B',
-              fontWeight: '700', fontSize: '13px', cursor: 'pointer',
-              transition: 'all 0.2s', fontFamily: "'DM Sans',sans-serif"
-            }}
-          >
-            🎫 Live Token Tracker
-          </button>
-        </div>
-
-        {activeTab === 'book' && (
-          <div style={{ background: '#fff', borderRadius: '20px', padding: '36px', boxShadow: '0 4px 24px rgba(11,123,111,0.08)', border: '1px solid #E2EEEC' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px', position: 'relative' }}>
+        <div style={{ background: '#fff', borderRadius: '20px', padding: '36px', boxShadow: '0 4px 24px rgba(11,123,111,0.08)', border: '1px solid #E2EEEC' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px', position: 'relative' }}>
               <div style={{ position: 'absolute', top: '16px', left: '20px', right: '20px', height: '2px', background: '#E2EEEC', zIndex: 0 }} />
               <div style={{ position: 'absolute', top: '16px', left: '20px', width: `${((step - 1) / 6) * 100}%`, height: '2px', background: '#0B7B6F', zIndex: 0, transition: 'width 0.3s' }} />
 
@@ -1007,7 +979,6 @@ export default function Queue() {
             )}
 
           </div>
-        )}
 
         {/* Live Queue widget underneath */}
         <LiveQueue data={queueData} />
