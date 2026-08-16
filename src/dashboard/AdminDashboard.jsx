@@ -102,10 +102,79 @@ export default function AdminDashboard() {
   const [apptFilterStatus, setApptFilterStatus] = useState('all')
   const [cancellingId, setCancellingId]       = useState(null)
 
+  // Current date in IST (Asia/Kolkata)
+  const todayIST = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date())
+
+  const formattedTodayIST = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  }).format(new Date())
+
+  // Admin Same-Day Manual Slot Booking State
+  const [showAddTodayAppt, setShowAddTodayAppt]       = useState(false)
+  const [apptClinic, setApptClinic]                   = useState('diaplus')
+  const [todaySlotsData, setTodaySlotsData]           = useState(null)
+  const [slotsLoading, setSlotsLoading]               = useState(false)
+  const [slotsError, setSlotsError]                   = useState('')
+  const [selectedSlot, setSelectedSlot]               = useState(null)
+  const [manualApptForm, setManualApptForm]           = useState({
+    name: '',
+    phone: '',
+    email: '',
+    place: '',
+    reason: '',
+    customReason: '',
+    consultationMode: 'IN_PERSON',
+    paymentMethod: 'CASH'
+  })
+  const [bookingApptLoading, setBookingApptLoading]   = useState(false)
+  const [manualApptSuccess, setManualApptSuccess]     = useState('')
+  const [manualApptError, setManualApptError]         = useState('')
+
   // Track pending requests to avoid duplicates
   const pendingRequests = useRef({})
   const lastRefreshTime = useRef({})
   const lastMutationTime = useRef(null)
+
+  // Fetch Today's Slot Availability from Backend
+  const fetchTodaySlots = useCallback(async (clinicToFetch) => {
+    const c = clinicToFetch || apptClinic
+    setSlotsLoading(true)
+    setSlotsError('')
+    try {
+      const response = await apiRequest(`/appointments/today-slots?clinic=${c}`)
+      if (response && response.success && response.data) {
+        setTodaySlotsData(response.data)
+        // If current selected slot is no longer available in fresh data, deselect it
+        setSelectedSlot(prev => {
+          if (!prev) return null
+          const match = response.data.slots.find(s => s.time24 === prev.time24)
+          return (match && match.available) ? match : null
+        })
+      } else {
+        setSlotsError(response?.message || "Failed to fetch today's slots.")
+      }
+    } catch (err) {
+      console.error('[AdminDashboard] Fetch today slots error:', err)
+      setSlotsError(err.data?.message || err.message || "Failed to fetch today's slots.")
+    } finally {
+      setSlotsLoading(false)
+    }
+  }, [apptClinic])
+
+  useEffect(() => {
+    if (showAddTodayAppt) {
+      fetchTodaySlots(apptClinic)
+    }
+  }, [showAddTodayAppt, apptClinic, fetchTodaySlots])
 
   // Fetch Queue Data
   const refreshQueue = useCallback(async (forceRefresh = false) => {
@@ -189,11 +258,15 @@ export default function AdminDashboard() {
     setApptSuccess('')
     try {
       const response = await apiRequest(`/appointments/${id}/cancel`, {
-        method: 'PATCH'
+        method: 'PATCH',
+        body: JSON.stringify({})
       })
       if (response && response.success) {
         setApptSuccess(`Appointment #${id.slice(0, 8)} has been cancelled and the slot is released.`)
         await fetchAppointments()
+        if (showAddTodayAppt) {
+          await fetchTodaySlots(apptClinic)
+        }
       } else {
         setApptError(response?.message || 'Failed to cancel appointment.')
       }
@@ -202,6 +275,92 @@ export default function AdminDashboard() {
       setApptError(err.data?.message || err.message || 'Failed to cancel appointment.')
     } finally {
       setCancellingId(null)
+    }
+  }
+
+  // Admin Same-Day Manual Slot Booking Action
+  async function handleManualBookAppointment() {
+    if (bookingApptLoading) return
+    if (!selectedSlot) {
+      setManualApptError('Please select an available appointment slot from the grid.')
+      return
+    }
+    if (!manualApptForm.name.trim()) {
+      setManualApptError('Patient Full Name is required.')
+      return
+    }
+    const cleanPhone = manualApptForm.phone.replace(/\D/g, '')
+    if (cleanPhone.length !== 10) {
+      setManualApptError('Please enter a valid 10-digit phone number.')
+      return
+    }
+    const finalReason = manualApptForm.reason === 'Other' && manualApptForm.customReason.trim()
+      ? manualApptForm.customReason.trim()
+      : manualApptForm.reason
+    if (!finalReason) {
+      setManualApptError('Please select or specify a reason for visit.')
+      return
+    }
+
+    setBookingApptLoading(true)
+    setManualApptError('')
+    setManualApptSuccess('')
+
+    try {
+      const requestBody = {
+        clinic: apptClinic,
+        consultationMode: manualApptForm.consultationMode,
+        appointmentDate: todayIST,
+        appointmentTime: selectedSlot.time24,
+        name: manualApptForm.name.trim(),
+        phone: cleanPhone,
+        email: manualApptForm.email.trim() || undefined,
+        place: manualApptForm.place.trim() || undefined,
+        reason: finalReason,
+        paymentMethod: manualApptForm.paymentMethod
+      }
+
+      const response = await apiRequest('/appointments/admin/book-today', {
+        method: 'POST',
+        body: JSON.stringify(requestBody)
+      })
+
+      if (response && response.success && response.data) {
+        const refId = response.data.referenceId || response.data.appointmentId.slice(0, 8).toUpperCase()
+        const successMsg = `Appointment #${refId} booked successfully for ${response.data.patientName} at ${response.data.appointmentTime12} (${response.data.clinic})!`
+        setManualApptSuccess(successMsg)
+        setApptSuccess(successMsg)
+
+        // Reset form
+        setManualApptForm({
+          name: '',
+          phone: '',
+          email: '',
+          place: '',
+          reason: '',
+          customReason: '',
+          consultationMode: 'IN_PERSON',
+          paymentMethod: 'CASH'
+        })
+        setSelectedSlot(null)
+
+        // Refresh slot availability & appointment lists
+        await fetchTodaySlots(apptClinic)
+        await fetchAppointments()
+      } else {
+        throw new Error(response?.message || 'Failed to book appointment.')
+      }
+    } catch (err) {
+      console.error('[AdminDashboard] Manual appointment booking error:', err)
+      if (err.status === 409 || err.data?.code === 'SLOT_ALREADY_BOOKED') {
+        setManualApptError('This slot was just booked. Please select another available slot.')
+        setSelectedSlot(null)
+        await fetchTodaySlots(apptClinic)
+      } else {
+        setManualApptError(err.data?.message || err.message || 'Failed to book appointment.')
+      }
+    } finally {
+      setBookingApptLoading(false)
     }
   }
 
@@ -524,18 +683,46 @@ export default function AdminDashboard() {
                     {actionLoading ? 'Calling next...' : 'Call Next Patient'}
                   </button>
 
-                  {/* Add Patient Toggle */}
-                  <button onClick={() => setShowAdd(!showAdd)} style={{
-                    background: '#fff', color: '#0B7B6F',
-                    border: '1.5px solid #B2DDD8', borderRadius: '12px',
-                    padding: '13px', fontSize: '13px', fontWeight: '700',
-                    cursor: 'pointer', fontFamily: "'DM Sans',sans-serif",
-                  }}>
-                    {showAdd ? 'Cancel' : '+ Add Patient Manually'}
-                  </button>
+                  {/* Actions Group: Live Queue vs Scheduled Appointment */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {/* Add Patient Toggle (Live Queue) */}
+                    <button onClick={() => { setShowAdd(!showAdd); if (!showAdd) setShowAddTodayAppt(false); }} style={{
+                      background: '#fff', color: '#0B7B6F',
+                      border: '1.5px solid #B2DDD8', borderRadius: '12px',
+                      padding: '13px', fontSize: '13px', fontWeight: '700',
+                      cursor: 'pointer', fontFamily: "'DM Sans',sans-serif",
+                    }}>
+                      {showAdd ? '✕ Cancel Live Queue Entry' : '+ Add Patient Manually (Live Queue)'}
+                    </button>
 
+                    {/* Add Today's Appointment Toggle (15-Min Slot) */}
+                    <button onClick={() => {
+                      const nextState = !showAddTodayAppt;
+                      setShowAddTodayAppt(nextState);
+                      if (nextState) {
+                        setShowAdd(false);
+                        setApptClinic(clinicId);
+                        fetchTodaySlots(clinicId);
+                      }
+                    }} style={{
+                      background: showAddTodayAppt ? 'linear-gradient(135deg,#0B7B6F,#096358)' : '#E6F4F2',
+                      color: showAddTodayAppt ? '#fff' : '#0B7B6F',
+                      border: '1.5px solid #0B7B6F', borderRadius: '12px',
+                      padding: '13px', fontSize: '13px', fontWeight: '700',
+                      cursor: 'pointer', fontFamily: "'DM Sans',sans-serif",
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                      boxShadow: showAddTodayAppt ? '0 4px 12px rgba(11,123,111,0.2)' : 'none',
+                      transition: 'all 0.2s'
+                    }}>
+                      <span>📅</span>
+                      <span>{showAddTodayAppt ? "✕ Close Today's Appointment Booking" : "+ Add Today's Appointment"}</span>
+                    </button>
+                  </div>
+
+                  {/* 1. Live Queue Manual Entry Form */}
                   {showAdd && (
                     <div style={{ background: '#fff', borderRadius: '14px', padding: '20px', border: '1px solid #E2EEEC' }}>
+                      <div style={{ fontWeight: '700', color: '#0A1628', fontSize: '14px', marginBottom: '12px' }}>Add to Live Waiting Queue</div>
                       {[
                         { label: 'Patient Name', key: 'name', type: 'text', ph: 'Full name' },
                         { label: 'Phone Number', key: 'phone', type: 'tel', ph: '10-digit number' },
@@ -568,6 +755,427 @@ export default function AdminDashboard() {
                       }}>
                         {adding ? 'Adding...' : 'Add to Queue'}
                       </button>
+                    </div>
+                  )}
+
+                  {/* 2. Admin Same-Day Manual Slot Booking Interface */}
+                  {showAddTodayAppt && (
+                    <div style={{
+                      background: '#fff',
+                      borderRadius: '14px',
+                      padding: '20px',
+                      border: '1.5px solid #B2DDD8',
+                      boxShadow: '0 4px 20px rgba(11,123,111,0.08)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '16px'
+                    }}>
+                      {/* Header */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #E2EEEC', paddingBottom: '12px' }}>
+                        <div>
+                          <div style={{ fontWeight: '800', color: '#0A1628', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>📅</span> Schedule Today's Appointment
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
+                            Assign a 15-min slot for <strong style={{ color: '#0B7B6F' }}>TODAY ({formattedTodayIST})</strong>
+                          </div>
+                        </div>
+                        <span style={{
+                          fontSize: '10px', fontWeight: '700', background: '#E6F4F2', color: '#0B7B6F',
+                          padding: '3px 8px', borderRadius: '20px', letterSpacing: '0.5px'
+                        }}>
+                          Asia/Kolkata (IST)
+                        </span>
+                      </div>
+
+                      {/* Success Alert */}
+                      {manualApptSuccess && (
+                        <div style={{
+                          background: '#ECFDF5', border: '1px solid #A7F3D0', color: '#065F46',
+                          borderRadius: '9px', padding: '10px 14px', fontSize: '12px',
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                        }}>
+                          <span>✓ {manualApptSuccess}</span>
+                          <button onClick={() => setManualApptSuccess('')} style={{ background: 'none', border: 'none', color: '#065F46', cursor: 'pointer', fontWeight: '700' }}>✕</button>
+                        </div>
+                      )}
+
+                      {/* Error Alert */}
+                      {manualApptError && (
+                        <div style={{
+                          background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C',
+                          borderRadius: '9px', padding: '10px 14px', fontSize: '12px',
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                        }}>
+                          <span>⚠️ {manualApptError}</span>
+                          <button onClick={() => setManualApptError('')} style={{ background: 'none', border: 'none', color: '#B91C1C', cursor: 'pointer', fontWeight: '700' }}>✕</button>
+                        </div>
+                      )}
+
+                      {/* Step 1: Clinic Selection */}
+                      <div>
+                        <label style={labelStyle}>Step 1: Select Clinic</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                          {[
+                            { id: 'diaplus', name: 'DiaPlus Clinic' },
+                            { id: 'thyroplus', name: 'ThyroPlus Clinic' }
+                          ].map(c => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => {
+                                if (apptClinic !== c.id) {
+                                  setApptClinic(c.id)
+                                  setSelectedSlot(null)
+                                  setManualApptError('')
+                                  fetchTodaySlots(c.id)
+                                }
+                              }}
+                              style={{
+                                padding: '10px 8px',
+                                borderRadius: '9px',
+                                border: `1.5px solid ${apptClinic === c.id ? '#0B7B6F' : '#E2EEEC'}`,
+                                background: apptClinic === c.id ? '#0B7B6F' : '#F8FAFA',
+                                color: apptClinic === c.id ? '#fff' : '#0A1628',
+                                fontWeight: '700',
+                                fontSize: '12px',
+                                cursor: 'pointer',
+                                fontFamily: "'DM Sans',sans-serif",
+                                transition: 'all 0.2s'
+                              }}
+                            >
+                              {c.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Step 2 & 3: Slot Grid with Live Availability */}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <label style={{ ...labelStyle, marginBottom: 0 }}>Step 2: Select 15-Min Available Slot</label>
+                          <button
+                            type="button"
+                            onClick={() => fetchTodaySlots(apptClinic)}
+                            disabled={slotsLoading}
+                            style={{
+                              background: 'none', border: 'none', color: '#0B7B6F',
+                              fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', gap: '4px'
+                            }}
+                          >
+                            {slotsLoading ? '⏳ Refreshing...' : '🔄 Refresh Slots'}
+                          </button>
+                        </div>
+
+                        {slotsError && (
+                          <div style={{ color: '#DC2626', fontSize: '11px', marginBottom: '8px' }}>{slotsError}</div>
+                        )}
+
+                        {slotsLoading && !todaySlotsData ? (
+                          <div style={{ padding: '24px', textAlign: 'center', color: '#94A3B8', fontSize: '12px', background: '#F8FAFA', borderRadius: '9px' }}>
+                            ⏳ Loading today's slot availability...
+                          </div>
+                        ) : todaySlotsData ? (
+                          <div>
+                            {/* Stats Badge */}
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', fontSize: '11px' }}>
+                              <span style={{ color: '#065F46', background: '#D1FAE5', padding: '2px 8px', borderRadius: '6px', fontWeight: '600' }}>
+                                ✓ {todaySlotsData.availableCount} Available
+                              </span>
+                              <span style={{ color: '#991B1B', background: '#FEE2E2', padding: '2px 8px', borderRadius: '6px', fontWeight: '600' }}>
+                                ● {todaySlotsData.bookedCount} Booked
+                              </span>
+                              <span style={{ color: '#64748B', background: '#F1F5F9', padding: '2px 8px', borderRadius: '6px', fontWeight: '600' }}>
+                                Total: {todaySlotsData.totalSlots} Slots
+                              </span>
+                            </div>
+
+                            {/* Slot Grid */}
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(auto-fill, minmax(82px, 1fr))',
+                              gap: '6px',
+                              maxHeight: '200px',
+                              overflowY: 'auto',
+                              padding: '4px',
+                              border: '1px solid #E2EEEC',
+                              borderRadius: '9px',
+                              background: '#F8FAFA'
+                            }}>
+                              {todaySlotsData.slots.map(slot => {
+                                const isSelected = selectedSlot?.time24 === slot.time24
+                                const isAvailable = slot.available
+                                const isBooked = slot.isBooked
+                                const isPast = slot.isPast
+
+                                return (
+                                  <button
+                                    key={slot.time24}
+                                    type="button"
+                                    disabled={!isAvailable}
+                                    onClick={() => {
+                                      if (isAvailable) {
+                                        setSelectedSlot(slot)
+                                        setManualApptError('')
+                                      }
+                                    }}
+                                    title={isBooked ? 'Slot is already booked' : isPast ? 'Slot has already passed' : 'Click to select this slot'}
+                                    style={{
+                                      padding: '8px 4px',
+                                      borderRadius: '8px',
+                                      border: `1.5px solid ${isSelected ? '#0B7B6F' : isAvailable ? '#A7F3D0' : '#E2E8F0'}`,
+                                      background: isSelected
+                                        ? 'linear-gradient(135deg,#0B7B6F,#096358)'
+                                        : isAvailable
+                                          ? '#FFFFFF'
+                                          : '#F1F5F9',
+                                      color: isSelected
+                                        ? '#FFFFFF'
+                                        : isAvailable
+                                          ? '#065F46'
+                                          : '#94A3B8',
+                                      cursor: isAvailable ? 'pointer' : 'not-allowed',
+                                      opacity: isAvailable ? 1 : 0.65,
+                                      fontFamily: "'DM Sans',sans-serif",
+                                      textAlign: 'center',
+                                      boxShadow: isSelected ? '0 2px 8px rgba(11,123,111,0.3)' : 'none',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                  >
+                                    <div style={{ fontSize: '11px', fontWeight: '700' }}>{slot.time12}</div>
+                                    <div style={{
+                                      fontSize: '9px',
+                                      fontWeight: '700',
+                                      marginTop: '2px',
+                                      color: isSelected ? '#E6F4F2' : isBooked ? '#DC2626' : isPast ? '#94A3B8' : '#0B7B6F',
+                                      textTransform: 'uppercase'
+                                    }}>
+                                      {isSelected ? '✓ Selected' : isBooked ? 'Booked' : isPast ? 'Past' : 'Open'}
+                                    </div>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {/* Step 4 & 5: Patient Details & Confirmation */}
+                      {selectedSlot ? (
+                        <div style={{ borderTop: '1px solid #E2EEEC', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                          {/* Selected Slot Highlight Card */}
+                          <div style={{
+                            background: '#E6F4F2', border: '1px solid #B2DDD8', borderRadius: '10px',
+                            padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                          }}>
+                            <div>
+                              <div style={{ fontSize: '10px', fontWeight: '700', color: '#0B7B6F', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Selected Slot</div>
+                              <div style={{ fontWeight: '800', color: '#0A1628', fontSize: '14px', marginTop: '2px' }}>
+                                {selectedSlot.time12} · {apptClinic === 'diaplus' ? 'DiaPlus' : 'ThyroPlus'}
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#64748B' }}>Date: TODAY ({todayIST})</div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedSlot(null)}
+                              style={{ background: 'none', border: '1px solid #0B7B6F', color: '#0B7B6F', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                            >
+                              Change Slot
+                            </button>
+                          </div>
+
+                          <label style={labelStyle}>Step 3: Patient Information</label>
+
+                          <div>
+                            <label style={{ fontSize: '11px', color: '#64748B', display: 'block', marginBottom: '4px', fontWeight: '600' }}>Patient Full Name *</label>
+                            <input
+                              type="text"
+                              placeholder="Full name of patient"
+                              value={manualApptForm.name}
+                              onChange={e => setManualApptForm(p => ({ ...p, name: e.target.value }))}
+                              style={inputStyle}
+                            />
+                          </div>
+
+                          <div>
+                            <label style={{ fontSize: '11px', color: '#64748B', display: 'block', marginBottom: '4px', fontWeight: '600' }}>Phone Number (10 digits) *</label>
+                            <input
+                              type="tel"
+                              placeholder="10-digit mobile number"
+                              maxLength={10}
+                              value={manualApptForm.phone}
+                              onChange={e => setManualApptForm(p => ({ ...p, phone: e.target.value.replace(/\D/g, '') }))}
+                              style={inputStyle}
+                            />
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                            <div>
+                              <label style={{ fontSize: '11px', color: '#64748B', display: 'block', marginBottom: '4px', fontWeight: '600' }}>Email (Optional)</label>
+                              <input
+                                type="email"
+                                placeholder="patient@example.com"
+                                value={manualApptForm.email}
+                                onChange={e => setManualApptForm(p => ({ ...p, email: e.target.value }))}
+                                style={{ ...inputStyle, padding: '9px 12px', fontSize: '13px' }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: '11px', color: '#64748B', display: 'block', marginBottom: '4px', fontWeight: '600' }}>Place / City (Optional)</label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Bangalore"
+                                value={manualApptForm.place}
+                                onChange={e => setManualApptForm(p => ({ ...p, place: e.target.value }))}
+                                style={{ ...inputStyle, padding: '9px 12px', fontSize: '13px' }}
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label style={{ fontSize: '11px', color: '#64748B', display: 'block', marginBottom: '4px', fontWeight: '600' }}>Reason for Visit *</label>
+                            <select
+                              value={manualApptForm.reason}
+                              onChange={e => setManualApptForm(p => ({ ...p, reason: e.target.value }))}
+                              style={{ ...inputStyle, padding: '9px 12px' }}
+                            >
+                              <option value="">Select reason for visit...</option>
+                              {REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+                            </select>
+                            {manualApptForm.reason === 'Other' && (
+                              <input
+                                type="text"
+                                placeholder="Specify custom reason"
+                                value={manualApptForm.customReason}
+                                onChange={e => setManualApptForm(p => ({ ...p, customReason: e.target.value }))}
+                                style={{ ...inputStyle, marginTop: '8px', padding: '9px 12px' }}
+                              />
+                            )}
+                          </div>
+
+                          {/* Consultation Mode */}
+                          <div>
+                            <label style={{ fontSize: '11px', color: '#64748B', display: 'block', marginBottom: '6px', fontWeight: '600' }}>Consultation Mode</label>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                              <button
+                                type="button"
+                                onClick={() => setManualApptForm(p => ({ ...p, consultationMode: 'IN_PERSON' }))}
+                                style={{
+                                  padding: '9px',
+                                  borderRadius: '8px',
+                                  border: `1.5px solid ${manualApptForm.consultationMode === 'IN_PERSON' ? '#0B7B6F' : '#E2EEEC'}`,
+                                  background: manualApptForm.consultationMode === 'IN_PERSON' ? '#E6F4F2' : '#F8FAFA',
+                                  color: manualApptForm.consultationMode === 'IN_PERSON' ? '#0B7B6F' : '#64748B',
+                                  fontWeight: '700',
+                                  fontSize: '12px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                🏥 In-Person
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setManualApptForm(p => ({ ...p, consultationMode: 'ONLINE' }))}
+                                style={{
+                                  padding: '9px',
+                                  borderRadius: '8px',
+                                  border: `1.5px solid ${manualApptForm.consultationMode === 'ONLINE' ? '#1D4ED8' : '#E2EEEC'}`,
+                                  background: manualApptForm.consultationMode === 'ONLINE' ? '#EFF6FF' : '#F8FAFA',
+                                  color: manualApptForm.consultationMode === 'ONLINE' ? '#1D4ED8' : '#64748B',
+                                  fontWeight: '700',
+                                  fontSize: '12px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                💻 Online Video
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Payment Method */}
+                          <div>
+                            <label style={{ fontSize: '11px', color: '#64748B', display: 'block', marginBottom: '6px', fontWeight: '600' }}>Payment Method</label>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                              <button
+                                type="button"
+                                onClick={() => setManualApptForm(p => ({ ...p, paymentMethod: 'CASH' }))}
+                                style={{
+                                  padding: '9px',
+                                  borderRadius: '8px',
+                                  border: `1.5px solid ${manualApptForm.paymentMethod === 'CASH' ? '#0B7B6F' : '#E2EEEC'}`,
+                                  background: manualApptForm.paymentMethod === 'CASH' ? '#E6F4F2' : '#F8FAFA',
+                                  color: manualApptForm.paymentMethod === 'CASH' ? '#0B7B6F' : '#64748B',
+                                  fontWeight: '700',
+                                  fontSize: '12px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                💵 Cash at Clinic
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setManualApptForm(p => ({ ...p, paymentMethod: 'ONLINE_UPI' }))}
+                                style={{
+                                  padding: '9px',
+                                  borderRadius: '8px',
+                                  border: `1.5px solid ${manualApptForm.paymentMethod === 'ONLINE_UPI' ? '#0B7B6F' : '#E2EEEC'}`,
+                                  background: manualApptForm.paymentMethod === 'ONLINE_UPI' ? '#E6F4F2' : '#F8FAFA',
+                                  color: manualApptForm.paymentMethod === 'ONLINE_UPI' ? '#0B7B6F' : '#64748B',
+                                  fontWeight: '700',
+                                  fontSize: '12px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                📱 Online / UPI
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Confirmation Summary Box */}
+                          <div style={{
+                            background: '#F8FAFA', border: '1px solid #E2EEEC', borderRadius: '10px',
+                            padding: '12px 14px', fontSize: '12px'
+                          }}>
+                            <div style={{ fontWeight: '700', color: '#0A1628', marginBottom: '6px', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                              Booking Summary:
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', color: '#475569' }}>
+                              <strong>Patient:</strong> <span>{manualApptForm.name || '—'} {manualApptForm.phone ? `(${manualApptForm.phone})` : ''}</span>
+                              <strong>Clinic:</strong> <span>{apptClinic === 'diaplus' ? 'DiaPlus Endocrinology' : 'ThyroPlus Endocrinology'}</span>
+                              <strong>Date:</strong> <span>TODAY ({formattedTodayIST})</span>
+                              <strong>Time:</strong> <span style={{ fontWeight: '700', color: '#0B7B6F' }}>{selectedSlot.time12}</span>
+                              <strong>Mode:</strong> <span>{manualApptForm.consultationMode === 'ONLINE' ? '💻 Online Video' : '🏥 In-Person'}</span>
+                              <strong>Payment:</strong> <span>{manualApptForm.paymentMethod === 'ONLINE_UPI' ? '📱 Online / UPI' : '💵 Cash'}</span>
+                              <strong>Reason:</strong> <span>{manualApptForm.reason === 'Other' ? (manualApptForm.customReason || 'Other') : (manualApptForm.reason || '—')}</span>
+                            </div>
+                          </div>
+
+                          {/* Book Appointment Action Button */}
+                          <button
+                            type="button"
+                            onClick={handleManualBookAppointment}
+                            disabled={bookingApptLoading}
+                            style={{
+                              width: '100%', background: 'linear-gradient(135deg,#0B7B6F,#096358)', color: '#fff',
+                              border: 'none', borderRadius: '10px', padding: '13px',
+                              fontSize: '14px', fontWeight: '700', cursor: bookingApptLoading ? 'not-allowed' : 'pointer',
+                              fontFamily: "'DM Sans',sans-serif", opacity: bookingApptLoading ? 0.7 : 1,
+                              boxShadow: '0 4px 14px rgba(11,123,111,0.25)',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            {bookingApptLoading ? '⏳ Booking Appointment...' : `Confirm & Book Slot (${selectedSlot.time12})`}
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{
+                          textAlign: 'center', padding: '14px', background: '#F8FAFA',
+                          borderRadius: '9px', color: '#64748B', fontSize: '12px', border: '1px dashed #CBD5E1'
+                        }}>
+                          👆 Please click an <strong style={{ color: '#0B7B6F' }}>OPEN</strong> slot above to continue with booking.
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -748,6 +1356,23 @@ export default function AdminDashboard() {
                     }}
                   >
                     🔄 Refresh
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTab('queue')
+                      setShowAddTodayAppt(true)
+                      setShowAdd(false)
+                      fetchTodaySlots(apptClinic)
+                    }}
+                    style={{
+                      background: 'linear-gradient(135deg,#0B7B6F,#096358)', color: '#fff', border: 'none', borderRadius: '8px',
+                      padding: '9px 14px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                      boxShadow: '0 2px 8px rgba(11,123,111,0.2)'
+                    }}
+                  >
+                    <span>📅</span>
+                    <span>+ Add Today's Appointment</span>
                   </button>
                 </div>
               </div>
